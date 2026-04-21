@@ -1,0 +1,99 @@
+======================================================================
+TEST SUITE 5: STRESS AND EDGE CASE TESTING
+======================================================================
+
+======================================================================
+STRESS 1: THROUGHPUT BENCHMARK
+======================================================================
+  Dataset: 555,719 transactions
+  Run 1: 1.90s (292,827 txns/sec, 0.0034 ms/txn)
+  Run 2: 1.95s (285,357 txns/sec, 0.0035 ms/txn)
+  Run 3: 1.82s (304,767 txns/sec, 0.0033 ms/txn)
+  Run 4: 1.77s (314,748 txns/sec, 0.0032 ms/txn)
+  Run 5: 1.81s (306,321 txns/sec, 0.0033 ms/txn)
+
+  Mean: 1.85s +/- 0.06s
+  Throughput: 300,440 transactions/second
+  Latency: 0.0033 ms per transaction
+  Banking requirement: < 100ms per transaction
+  RESULT: PASS (0.0033 ms < 100 ms)
+
+======================================================================
+STRESS 2: EXTREME VALUES
+======================================================================
+
+  Test                                         Prob       Risk  Valid Notes
+  --------------------------------------------------------------------------------
+  amt=$0.01 (minimum)                        0.0000        LOW     OK Near-certain normal
+  amt=$0.00 (zero)                           0.0000        LOW     OK Near-certain normal
+  amt=-$50 (negative)                        0.0000        LOW     OK Near-certain normal
+  amt=$99,999 (massive)                      0.0006        LOW     OK Near-certain normal
+  amt=$1,000,000 (absurd)                    0.0006        LOW     OK Near-certain normal
+  velocity_1h=0 (impossible)                 0.0000        LOW     OK Near-certain normal
+  velocity_1h=100                            0.0000        LOW     OK Near-certain normal
+  velocity_1h=1000 (absurd)                  0.0000        LOW     OK Near-certain normal
+  age=0 (baby)                               0.0000        LOW     OK Near-certain normal
+  age=150 (impossible)                       0.0001        LOW     OK Near-certain normal
+  age=-5 (negative)                          0.0000        LOW     OK Near-certain normal
+  hour=-1 (invalid)                          0.0001        LOW     OK Near-certain normal
+  hour=25 (invalid)                          0.0000        LOW     OK Near-certain normal
+  city_pop=0 (ghost town)                    0.0001        LOW     OK Near-certain normal
+  city_pop=50,000,000 (mega city)            0.0001        LOW     OK Near-certain normal
+  ALL features = 0                           0.0001        LOW     OK Near-certain normal
+  ALL features = max training value          0.0146        LOW     OK 
+  ALL features = min training value          0.0001        LOW     OK Near-certain normal
+
+  RESULT: PASS — All extreme values handled, all probabilities in [0,1]
+
+======================================================================
+STRESS 3: MISSING DATA HANDLING (NaN)
+======================================================================
+
+  Testing NaN in each feature one at a time:
+    NaN in amt                                : prob=0.0006 OK
+    NaN in city_pop                           : prob=0.0001 OK
+    NaN in hour                               : prob=0.0000 OK
+    NaN in month                              : prob=0.0001 OK
+    NaN in distance_cardholder_merchant       : prob=0.0000 OK
+    NaN in age                                : prob=0.0001 OK
+    NaN in is_weekend                         : prob=0.0004 OK
+    NaN in is_night                           : prob=0.3678 OK
+    NaN in velocity_1h                        : prob=0.0000 OK
+    NaN in velocity_24h                       : prob=0.0001 OK
+    NaN in amount_velocity_1h                 : prob=0.0002 OK
+    NaN in category_encoded                   : prob=0.0000 OK
+    NaN in gender_encoded                     : prob=0.0000 OK
+    NaN in day_of_week_encoded                : prob=0.0000 OK
+    ALL features NaN: prob=0.0146
+
+  RESULT: PASS — XGBoost handles NaN natively (uses default direction at splits)
+
+======================================================================
+STRESS 4: DATA TYPE ERROR HANDLING
+======================================================================
+    String 'hello' for amt                       : CAUGHT — TypeError: Feature 'amt' must be numeric, got str: hello
+    Boolean True for velocity_1h                 : prob=0.0000 (bool treated as int — acceptable)
+    List [1,2,3] for age                         : CAUGHT — TypeError: Feature 'age' must be numeric, got list: [1, 2, 3]
+    None for hour                                : CAUGHT — TypeError: Feature 'hour' must be numeric, got NoneType: None
+    Dict for amt                                 : CAUGHT — TypeError: Feature 'amt' must be numeric, got dict: {'value': 100}
+
+  RESULT: PASS — 5/5 type errors handled
+
+======================================================================
+STRESS 5: CONSISTENCY CHECK (1000 identical predictions)
+======================================================================
+  Transaction: amt=$500, hour=22, is_night=1
+  Predicted 1000 times
+  First probability: 0.0503250808
+  Last probability:  0.0503250808
+  Unique probabilities: 1
+  All identical: True
+
+  RESULT: PASS — All 1000 predictions identical (XGBoost is deterministic)
+
+======================================================================
+TEST SUITE 5 SUMMARY
+  Tests passed: 5/5
+  Tests failed: 0/5
+  Time: 11.0s
+======================================================================

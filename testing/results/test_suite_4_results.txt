@@ -1,0 +1,133 @@
+======================================================================
+TEST SUITE 4: ADVERSARIAL / EVASION TESTING
+======================================================================
+
+======================================================================
+EVASION 1: AMOUNT SPLITTING ($1000 total)
+======================================================================
+  A: 2x$500, 30min apart: 1/2 caught (50%)
+  B: 5x$200, 15min apart: 2/5 caught (40%)
+  C: 10x$100, 10min apart: 0/10 caught (0%)
+  D: 20x$50, 5min apart: 0/20 caught (0%)
+  E: 50x$20, 2min apart: 0/50 caught (0%)
+  Saved: splitting_evasion.png
+  Most effective evasion: C: 10x$100, 10min apart (0% detected)
+
+======================================================================
+EVASION 2: TIME SPACING (10x$100)
+======================================================================
+  A: 5min apart: 3/10 caught (30%)
+  B: 30min apart: 0/10 caught (0%)
+  C: 2hr apart: 0/10 caught (0%)
+  D: 6hr apart: 0/10 caught (0%)
+  E: 1day apart: 0/10 caught (0%)
+
+======================================================================
+EVASION 3: CATEGORY CAMOUFLAGE ($500, 11pm)
+======================================================================
+  Electronics/online        (code=13): prob=0.0270, LOW      [evaded]
+  Grocery (most common)     (code=13): prob=0.0270, LOW      [evaded]
+  Gas/Transport             (code=13): prob=0.0270, LOW      [evaded]
+  Travel                    (code=13): prob=0.0270, LOW      [evaded]
+  Food/Dining               (code=13): prob=0.0270, LOW      [evaded]
+  Health                    (code=13): prob=0.0270, LOW      [evaded]
+  Best camouflage: shopping_net (prob=0.0270)
+  Worst camouflage: shopping_net (prob=0.0270)
+  Category impact: 0.0000 probability difference
+
+======================================================================
+EVASION 4: TIME OF DAY CAMOUFLAGE ($500, velocity=3)
+======================================================================
+  3am (peak fraud)          (is_night=1): prob=0.9992, CRITICAL [FLAGGED]
+  8am (morning)             (is_night=0): prob=0.2543, MEDIUM   [evaded]
+  12pm (lunch)              (is_night=0): prob=0.0390, LOW      [evaded]
+  3pm (afternoon)           (is_night=0): prob=0.0400, LOW      [evaded]
+  6pm (evening)             (is_night=0): prob=0.0468, LOW      [evaded]
+  9pm (night)               (is_night=0): prob=0.0341, LOW      [evaded]
+  11pm (late night)         (is_night=1): prob=0.9956, CRITICAL [FLAGGED]
+
+======================================================================
+EVASION 5: OPTIMAL EVASION STRATEGY
+======================================================================
+  Optimal evasion transaction:
+    amt=$100, hour=14 (daytime), category=travel, velocity_1h=1
+    Probability: 0.0000 (0.0%)
+    Classification: NORMAL
+    Risk level: LOW
+
+  Aggressive evasion ($500 instead of $100):
+    Probability: 0.0000 (0.0%)
+    Classification: NORMAL
+
+  CONCLUSION: A fraudster CAN evade detection by transacting during the day,
+  using travel category, with low velocity. The model gives only 0.0000 probability.
+  This is a KNOWN LIMITATION — the model relies heavily on is_night as a discriminator.
+
+======================================================================
+EVASION 6: FEATURE MANIPULATION COST
+======================================================================
+  Starting fraud transaction: prob=0.9458 (CRITICAL)
+
+  Changing 1 feature at a time to median value:
+    Change amt                                 ->      47.52: prob=0.3796 *** FLIPPED
+    Change city_pop                            ->    2456.00: prob=0.9458
+    Change hour                                ->      14.00: prob=0.9250
+    Change month                               ->       6.00: prob=0.9458
+    Change distance_cardholder_merchant        ->      78.23: prob=0.9458
+    Change age                                 ->      44.00: prob=0.9458
+    Change is_weekend                          ->       0.00: prob=0.9458
+    Change is_night                            ->       0.00: prob=0.0969 *** FLIPPED
+    Change velocity_1h                         ->       1.00: prob=0.5401
+    Change velocity_24h                        ->       4.00: prob=0.9114
+    Change amount_velocity_1h                  ->      54.29: prob=0.0097 *** FLIPPED
+    Change category_encoded                    ->       6.00: prob=0.9997
+    Change gender_encoded                      ->       0.00: prob=0.9458
+    Change day_of_week_encoded                 ->       3.00: prob=0.9458
+
+  Single-feature flips found: ['amt', 'is_night', 'amount_velocity_1h']
+
+  Trying 2-feature combinations (top 6 most impactful):
+    Change amount_velocity_1h + is_night: prob=0.0013 *** FLIPPED
+    Change amount_velocity_1h + amt: prob=0.0007 *** FLIPPED
+    Change amount_velocity_1h + velocity_1h: prob=0.0046 *** FLIPPED
+    Change amount_velocity_1h + velocity_24h: prob=0.0041 *** FLIPPED
+    Change amount_velocity_1h + hour: prob=0.1873 *** FLIPPED
+    Change is_night + amt: prob=0.0037 *** FLIPPED
+    Change is_night + velocity_1h: prob=0.1048 *** FLIPPED
+    Change is_night + velocity_24h: prob=0.0540 *** FLIPPED
+    Change is_night + hour: prob=0.0046 *** FLIPPED
+    Change amt + velocity_1h: prob=0.0047 *** FLIPPED
+    Change amt + velocity_24h: prob=0.2263 *** FLIPPED
+    Change velocity_1h + velocity_24h: prob=0.3772 *** FLIPPED
+
+  Trying 3-feature combinations (top 6):
+    Change amount_velocity_1h + is_night + amt: prob=0.0001 *** FLIPPED
+    Change amount_velocity_1h + is_night + velocity_1h: prob=0.0024 *** FLIPPED
+    Change amount_velocity_1h + is_night + velocity_24h: prob=0.0004 *** FLIPPED
+    Change amount_velocity_1h + is_night + hour: prob=0.0002 *** FLIPPED
+    Change amount_velocity_1h + amt + velocity_1h: prob=0.0003 *** FLIPPED
+    Change amount_velocity_1h + amt + velocity_24h: prob=0.0003 *** FLIPPED
+    Change amount_velocity_1h + amt + hour: prob=0.2247 *** FLIPPED
+    Change amount_velocity_1h + velocity_1h + velocity_24h: prob=0.0019 *** FLIPPED
+    Change amount_velocity_1h + velocity_1h + hour: prob=0.2010 *** FLIPPED
+    Change amount_velocity_1h + velocity_24h + hour: prob=0.0757 *** FLIPPED
+    Change is_night + amt + velocity_1h: prob=0.0014 *** FLIPPED
+    Change is_night + amt + velocity_24h: prob=0.0017 *** FLIPPED
+    Change is_night + amt + hour: prob=0.0016 *** FLIPPED
+    Change is_night + velocity_1h + velocity_24h: prob=0.0246 *** FLIPPED
+    Change is_night + velocity_1h + hour: prob=0.0084 *** FLIPPED
+    Change is_night + velocity_24h + hour: prob=0.0025 *** FLIPPED
+    Change amt + velocity_1h + velocity_24h: prob=0.0016 *** FLIPPED
+    Change amt + velocity_1h + hour: prob=0.1768 *** FLIPPED
+    Change velocity_1h + velocity_24h + hour: prob=0.4246 *** FLIPPED
+
+  CONCLUSION: A fraudster would need to manipulate at least 1 feature(s) to evade detection.
+  This quantifies the model's robustness against adversarial manipulation.
+
+======================================================================
+TEST SUITE 4 SUMMARY
+  Tests passed: 6/6
+  Tests failed: 0/6
+  Time: 10.3s
+  Plot saved: splitting_evasion.png
+======================================================================

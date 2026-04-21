@@ -1,0 +1,23 @@
+# Oversized raw dataset (GitHub 100MB limit)
+fraudTrain.csv
+fraudTest.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env
+.env.*

@@ -1,0 +1,103 @@
+======================================================================
+TEST SUITE 7: MULTI-MODEL COMPARISON
+======================================================================
+
+Loading models...
+  XGB_CW loaded
+  XGB_Tuned loaded
+  AE_XGB loaded
+  BDS_XGB loaded
+  Models loaded: 4/4
+
+======================================================================
+COMPARE 1: SAME 200 FRAUDS, ALL MODELS
+======================================================================
+  Sampled 200 fraud transactions
+  XGB_CW      : caught 196/200 (98.0%) in 1.8s
+  XGB_Tuned   : caught 174/200 (87.0%) in 9.2s
+  AE_XGB      : caught 170/200 (85.0%) in 5.6s
+  BDS_XGB     : caught 164/200 (82.0%) in 10.0s
+
+  Agreement analysis:
+    Caught by ALL models: 159
+    Missed by ALL models: 4
+    Caught ONLY by XGB_CW: 20
+
+  Profile of 4 frauds missed by ALL models:
+    amt: mean=58.59, median=15.43
+    hour: mean=20.50, median=21.00
+    is_night: mean=0.50, median=0.50
+    velocity_1h: mean=2.00, median=1.50
+    amount_velocity_1h: mean=224.94, median=108.18
+    These are the UNCATCHABLE frauds — small amounts, daytime, normal velocity
+
+  RESULT: PASS
+
+======================================================================
+COMPARE 2: PROBABILITY CORRELATION
+======================================================================
+  XGB_CW vs XGB_Tuned: correlation = 0.6459
+  XGB_CW vs AE_XGB: correlation = 0.6206
+  XGB_CW vs BDS_XGB: correlation = 0.5679
+  XGB_Tuned vs AE_XGB: correlation = 0.9736
+  XGB_Tuned vs BDS_XGB: correlation = 0.8551
+  AE_XGB vs BDS_XGB: correlation = 0.8615
+  Saved: probability_correlation.png
+  RESULT: PASS
+
+======================================================================
+COMPARE 3: ERROR OVERLAP (full test set)
+======================================================================
+  Predicting full test set with XGB_CW...
+  Predicting full test set with XGB_Tuned...
+  Predicting full test set with AE_XGB...
+  Predicting full test set with BDS_XGB...
+  XGB_CW: 116 missed frauds, 3608 false positives
+  XGB_Tuned: 420 missed frauds, 114 false positives
+  AE_XGB: 427 missed frauds, 99 false positives
+  BDS_XGB: 475 missed frauds, 151 false positives
+
+  Jaccard Similarity (missed fraud overlap):
+                      XGB_CW     XGB_Tuned        AE_XGB       BDS_XGB
+        XGB_CW        1.0000        0.2701        0.2628        0.2390
+     XGB_Tuned        0.2701        1.0000        0.8822        0.7379
+        AE_XGB        0.2628        0.8822        1.0000        0.7380
+       BDS_XGB        0.2390        0.7379        0.7380        1.0000
+
+  XGB_Tuned vs AE_XGB missed fraud overlap:
+    Both miss: 397
+    Only XGB misses: 23 (AE catches these)
+    Only AE misses: 30 (XGB catches these)
+    High overlap — models fail on same transactions
+
+  RESULT: PASS
+
+======================================================================
+COMPARE 4: PERFORMANCE BY FRAUD TYPE
+======================================================================
+
+  Fraud type distribution:
+    Camouflaged (normal pattern)       :  1059
+    Classic (high amt + night)         :   886
+    Velocity (3+ txns/hr)              :   133
+    Stealthy (low amt + day)           :    67
+
+  Fraud Type                              XGB_CW  XGB_Tuned     AE_XGB    BDS_XGB         Best
+  -----------------------------------------------------------------------------------------------
+  Camouflaged (normal pattern)             94.1%      72.0%      71.9%      66.1%       XGB_CW
+  Classic (high amt + night)               99.2%      95.3%      94.9%      96.6%       XGB_CW
+  Velocity (3+ txns/hr)                    95.5%      78.2%      75.9%      75.9%       XGB_CW
+  Stealthy (low amt + day)                 40.3%      22.4%      22.4%      19.4%       XGB_CW
+
+  Saved: recall_by_fraud_type.png
+  Saved: model_agreement_matrix.png
+
+  RESULT: PASS
+
+======================================================================
+TEST SUITE 7 SUMMARY
+  Tests passed: 4/4
+  Tests failed: 0/4
+  Time: 680.5s
+  Plots: probability_correlation.png, recall_by_fraud_type.png, model_agreement_matrix.png
+======================================================================

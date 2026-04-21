@@ -1,0 +1,280 @@
+======================================================================
+TEST SUITE 1: SINGLE TRANSACTION DEEP ANALYSIS
+======================================================================
+
+======================================================================
+TEST 1A: FIRST 10 TRANSACTIONS
+======================================================================
+  Row   0 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: is_night                  | OK
+  Row   1 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: is_night                  | OK
+  Row   2 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: amt                       | OK
+  Row   3 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: is_night                  | OK
+  Row   4 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: is_night                  | OK
+  Row   5 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: is_night                  | OK
+  Row   6 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: is_night                  | OK
+  Row   7 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0001 | Risk: LOW      | Top SHAP: is_night                  | OK
+  Row   8 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0001 | Risk: LOW      | Top SHAP: amt                       | OK
+  Row   9 | Actual: NORMAL | Pred: NORMAL | Prob: 0.0000 | Risk: LOW      | Top SHAP: amt                       | OK
+
+  TEST 1A: PASS — All 10 predictions valid, probabilities in [0,1]
+
+======================================================================
+TEST 1B: RANDOM SAMPLE OF 50
+======================================================================
+  Sample size: 50
+  Frauds in sample: 0
+  Correct predictions: 50/50
+  Accuracy: 100.00%
+
+  Top 3 most confident CORRECT predictions:
+    1. Row 48517: NORMAL, prob=0.0000, confidence=1.0000
+    2. Row 314574: NORMAL, prob=0.0000, confidence=1.0000
+    3. Row 327281: NORMAL, prob=0.0000, confidence=1.0000
+
+  Top 3 most confident WRONG predictions:
+    No wrong predictions in this sample!
+
+  TEST 1B: PASS — Accuracy 100.00% > 80%
+
+======================================================================
+TEST 1C: ALL TRUE FRAUDS (2,145)
+======================================================================
+  Model catches 1725 out of 2145 frauds (80.42%)
+  Missed: 420
+
+  Top 10 most confidently CAUGHT frauds:
+    1. Row 503749: prob=1.0000, amt=$334.54, hour=22
+       amount_velocity_1h: SHAP=+4.9285
+       amt: SHAP=+2.2924
+       category_encoded: SHAP=+1.9849
+    2. Row 116414: prob=1.0000, amt=$331.69, hour=23
+       amount_velocity_1h: SHAP=+5.2582
+       amt: SHAP=+2.2257
+       category_encoded: SHAP=+1.8396
+    3. Row 284738: prob=1.0000, amt=$312.50, hour=23
+       amount_velocity_1h: SHAP=+4.8235
+       amt: SHAP=+1.9101
+       category_encoded: SHAP=+1.7607
+    4. Row 64678: prob=1.0000, amt=$974.10, hour=23
+       amount_velocity_1h: SHAP=+6.0636
+       amt: SHAP=+2.3587
+       is_night: SHAP=+1.1454
+    5. Row 503758: prob=1.0000, amt=$740.92, hour=23
+       amount_velocity_1h: SHAP=+5.9166
+       amt: SHAP=+2.3754
+       is_night: SHAP=+1.0378
+    6. Row 64677: prob=1.0000, amt=$839.55, hour=23
+       amount_velocity_1h: SHAP=+6.0875
+       amt: SHAP=+2.4855
+       is_night: SHAP=+1.0926
+    7. Row 11301: prob=0.9999, amt=$321.51, hour=22
+       amount_velocity_1h: SHAP=+5.1836
+       amt: SHAP=+2.3647
+       category_encoded: SHAP=+1.9831
+    8. Row 538920: prob=0.9999, amt=$826.05, hour=23
+       amount_velocity_1h: SHAP=+5.6917
+       amt: SHAP=+2.2603
+       is_night: SHAP=+1.0997
+    9. Row 64679: prob=0.9999, amt=$1023.35, hour=23
+       amount_velocity_1h: SHAP=+6.0936
+       amt: SHAP=+2.4567
+       is_night: SHAP=+1.0984
+    10. Row 395134: prob=0.9999, amt=$925.31, hour=23
+       amount_velocity_1h: SHAP=+5.9652
+       amt: SHAP=+2.6120
+       is_night: SHAP=+1.0850
+
+  Top 10 most confidently MISSED frauds (model was most wrong):
+    1. Row 421577: prob=0.0000, amt=$5.26, hour=21
+       is_night: SHAP=-3.5494 — Transaction occurred during the day — daytime transactions are typically legitimate
+       amt: SHAP=-2.2582 — Low transaction amount ($5.26) — small amounts are typical of normal spending
+       amount_velocity_1h: SHAP=-1.7668 — Card spending velocity is low ($5.26/hr) — consistent with normal behaviour
+       No unusual features — this fraud looks completely normal
+    2. Row 533060: prob=0.0001, amt=$7.88, hour=12
+       is_night: SHAP=-3.5412 — Transaction occurred during the day — daytime transactions are typically legitimate
+       category_encoded: SHAP=-1.7141 — Merchant category (grocery_net) is a common, low-risk category
+       amount_velocity_1h: SHAP=-1.2378 — Card spending velocity is low ($7.88/hr) — consistent with normal behaviour
+       No unusual features — this fraud looks completely normal
+    3. Row 92932: prob=0.0001, amt=$7.90, hour=14
+       is_night: SHAP=-3.7488 — Transaction occurred during the day — daytime transactions are typically legitimate
+       category_encoded: SHAP=-1.4615 — Merchant category (grocery_net) is a common, low-risk category
+       amount_velocity_1h: SHAP=-1.2523 — Card spending velocity is low ($7.90/hr) — consistent with normal behaviour
+       No unusual features — this fraud looks completely normal
+    4. Row 455575: prob=0.0002, amt=$1.78, hour=12
+       is_night: SHAP=-3.4191 — Transaction occurred during the day — daytime transactions are typically legitimate
+       amt: SHAP=-2.1962 — Low transaction amount ($1.78) — small amounts are typical of normal spending
+       amount_velocity_1h: SHAP=-1.4246 — Card spending velocity is low ($1.78/hr) — consistent with normal behaviour
+       No unusual features — this fraud looks completely normal
+    5. Row 395125: prob=0.0002, amt=$17.45, hour=13
+       is_night: SHAP=-3.5733 — Transaction occurred during the day — daytime transactions are typically legitimate
+       velocity_24h: SHAP=-1.6487 — Normal transaction count (1) in the last 24 hours
+       amount_velocity_1h: SHAP=-1.2423 — Card spending velocity is low ($17.45/hr) — consistent with normal behaviour
+       No unusual features — this fraud looks completely normal
+    6. Row 20178: prob=0.0002, amt=$21.29, hour=18
+       is_night: SHAP=-3.6421 — Transaction occurred during the day — daytime transactions are typically legitimate
+       velocity_24h: SHAP=-2.1289 — Normal transaction count (1) in the last 24 hours
+       amount_velocity_1h: SHAP=-1.2659 — Card spending velocity is low ($21.29/hr) — consistent with normal behaviour
+       No unusual features — this fraud looks completely normal
+    7. Row 533053: prob=0.0003, amt=$8.96, hour=17
+       is_night: SHAP=-3.7118 — Transaction occurred during the day — daytime transactions are typically legitimate
+       category_encoded: SHAP=-1.4374 — Merchant category (grocery_net) is a common, low-risk category
+       amount_velocity_1h: SHAP=-1.1147 — Card spending velocity is low ($8.96/hr) — consistent with normal behaviour
+       No unusual features — this fraud looks completely normal
+    8. Row 62279: prob=0.0003, amt=$1.99, hour=16
+       is_night: SHAP=-3.3836 — Transaction occurred during the day — daytime transactions are typically legitimate
+       amt: SHAP=-2.1691 — Low transaction amount ($1.99) — small amounts are typical of normal spending
+       hour: SHAP=+1.3283 — Transaction at hour 16 — this time of day is associated with higher fraud risk
+       No unusual features — this fraud looks completely normal
+    9. Row 62271: prob=0.0004, amt=$8.49, hour=22
+       category_encoded: SHAP=-2.0553 — Merchant category (grocery_net) is a common, low-risk category
+       amount_velocity_1h: SHAP=-1.7271 — Card spending velocity is low ($8.49/hr) — consistent with normal behaviour
+       velocity_24h: SHAP=-1.3007 — Normal transaction count (1) in the last 24 hours
+       No unusual features — this fraud looks completely normal
+    10. Row 151012: prob=0.0004, amt=$95.52, hour=23
+       amount_velocity_1h: SHAP=-2.3611 — Card spending velocity is low ($95.52/hr) — consistent with normal behaviour
+       velocity_24h: SHAP=-1.6883 — Normal transaction count (1) in the last 24 hours
+       amt: SHAP=-1.3145 — Low transaction amount ($95.52) — small amounts are typical of normal spending
+       No unusual features — this fraud looks completely normal
+
+  --- Caught vs Missed Fraud Comparison ---
+  Feature                         Caught Mean  Missed Mean   Difference
+  ------------------------------------------------------------------
+  amt                                  600.16       233.46      +366.70
+  city_pop                           69308.77     44899.45    +24409.32
+  hour                                  13.39        16.95        -3.57
+  month                                  9.16         9.02        +0.14
+  distance_cardholder_merchant          75.96        77.26        -1.30
+  age                                   50.31        42.28        +8.03
+  is_weekend                             0.29         0.34        -0.05
+  is_night                               0.90         0.69        +0.21
+  velocity_1h                            1.75         1.34        +0.42
+  velocity_24h                           5.46         5.87        -0.40
+  amount_velocity_1h                  1098.10       288.69      +809.41
+  category_encoded                       7.31         7.28        +0.03
+  gender_encoded                         0.52         0.21        +0.31
+  day_of_week_encoded                    3.04         3.13        -0.10
+
+  TEST 1C: PASS — Recall 0.8042 matches expected 0.8079 (within 0.02)
+
+======================================================================
+TEST 1D: FALSE POSITIVES DEEP DIVE
+======================================================================
+  Model falsely flagged 114 normal transactions as fraud
+
+  Top 10 most confident FALSE POSITIVES:
+    1. Row 379770: prob=0.9954, amt=$284.77, hour=3, cat=4
+       category_encoded: SHAP=+2.5061 — Merchant category (home) is associated with higher fraud rates
+       amount_velocity_1h: SHAP=+2.4723 — Card spent $284.77 in the last hour — unusually high spending velocity suggests fraud
+       amt: SHAP=+2.4230 — High transaction amount ($284.77) — larger transactions are more associated with fraud
+    2. Row 505983: prob=0.9939, amt=$283.26, hour=0, cat=4
+       amount_velocity_1h: SHAP=+2.4546 — Card spent $283.26 in the last hour — unusually high spending velocity suggests fraud
+       amt: SHAP=+2.4541 — High transaction amount ($283.26) — larger transactions are more associated with fraud
+       category_encoded: SHAP=+2.4393 — Merchant category (home) is associated with higher fraud rates
+    3. Row 429498: prob=0.9918, amt=$19.73, hour=1, cat=2
+       category_encoded: SHAP=+4.2813 — Merchant category (grocery_pos) is associated with higher fraud rates
+       amt: SHAP=+2.0346 — High transaction amount ($19.73) — larger transactions are more associated with fraud
+       is_night: SHAP=+1.1983 — Transaction occurred at night — nighttime transactions have higher fraud rates
+    4. Row 115921: prob=0.9721, amt=$1010.41, hour=22, cat=11
+       amount_velocity_1h: SHAP=+4.0842 — Card spent $1010.41 in the last hour — unusually high spending velocity suggests fraud
+       amt: SHAP=+2.2077 — High transaction amount ($1010.41) — larger transactions are more associated with fraud
+       is_night: SHAP=+0.8999 — Transaction occurred at night — nighttime transactions have higher fraud rates
+    5. Row 324348: prob=0.9719, amt=$290.88, hour=4, cat=4
+       amt: SHAP=+2.7656 — High transaction amount ($290.88) — larger transactions are more associated with fraud
+       amount_velocity_1h: SHAP=+2.7536 — Card spent $607.76 in the last hour — unusually high spending velocity suggests fraud
+       category_encoded: SHAP=+2.3077 — Merchant category (home) is associated with higher fraud rates
+    6. Row 15209: prob=0.9674, amt=$998.73, hour=23, cat=11
+       amount_velocity_1h: SHAP=+4.0398 — Card spent $1001.09 in the last hour — unusually high spending velocity suggests fraud
+       amt: SHAP=+1.8617 — High transaction amount ($998.73) — larger transactions are more associated with fraud
+       is_night: SHAP=+1.0962 — Transaction occurred at night — nighttime transactions have higher fraud rates
+    7. Row 377129: prob=0.9500, amt=$958.83, hour=22, cat=11
+       amount_velocity_1h: SHAP=+3.6960 — Card spent $958.83 in the last hour — unusually high spending velocity suggests fraud
+       amt: SHAP=+2.0864 — High transaction amount ($958.83) — larger transactions are more associated with fraud
+       is_night: SHAP=+0.9037 — Transaction occurred at night — nighttime transactions have higher fraud rates
+    8. Row 259260: prob=0.9492, amt=$934.86, hour=20, cat=11
+       amount_velocity_1h: SHAP=+4.0451 — Card spent $934.86 in the last hour — unusually high spending velocity suggests fraud
+       is_night: SHAP=-3.0844 — Transaction occurred during the day — daytime transactions are typically legitimate
+       amt: SHAP=+2.9616 — High transaction amount ($934.86) — larger transactions are more associated with fraud
+    9. Row 249079: prob=0.9450, amt=$1111.46, hour=22, cat=11
+       amount_velocity_1h: SHAP=+3.9394 — Card spent $1111.46 in the last hour — unusually high spending velocity suggests fraud
+       amt: SHAP=+1.7855 — High transaction amount ($1111.46) — larger transactions are more associated with fraud
+       velocity_24h: SHAP=-0.9813 — Normal transaction count (2) in the last 24 hours
+    10. Row 328966: prob=0.9443, amt=$1078.61, hour=23, cat=11
+       amount_velocity_1h: SHAP=+4.0738 — Card spent $1078.61 in the last hour — unusually high spending velocity suggests fraud
+       amt: SHAP=+1.8274 — High transaction amount ($1078.61) — larger transactions are more associated with fraud
+       is_night: SHAP=+0.8184 — Transaction occurred at night — nighttime transactions have higher fraud rates
+
+  --- False Positive Profile vs True Fraud Profile ---
+  Feature                             FP Mean TrueFraud Mean   Similar?
+  --------------------------------------------------------------------
+  amt                                  639.29         528.36        YES
+  city_pop                           82067.49       64529.32        YES
+  hour                                  14.90          14.09        YES
+  month                                  9.34           9.14        YES
+  distance_cardholder_merchant          82.02          76.21        YES
+  age                                   38.61          48.74        YES
+  is_weekend                             0.27           0.30        YES
+  is_night                               0.90           0.86        YES
+  velocity_1h                            1.56           1.67        YES
+  velocity_24h                           5.63           5.54        YES
+  amount_velocity_1h                   807.19         939.62        YES
+  category_encoded                       7.75           7.30        YES
+  gender_encoded                         0.52           0.46        YES
+  day_of_week_encoded                    2.85           3.05        YES
+
+  TEST 1D: PASS — FP count 114 within expected range (target 114 ±20)
+
+======================================================================
+TEST 1E: BORDERLINE CASES (probability 0.4-0.6)
+======================================================================
+  Found 152 borderline transactions (prob 0.4-0.6)
+  Showing first 20: 6 fraud, 14 normal
+    1. Row 2260: Actual=NORMAL, Pred=FRAUD, Prob=0.5898 [WRONG]
+    2. Row 11543: Actual=NORMAL, Pred=NORMAL, Prob=0.4128 [OK]
+    3. Row 11756: Actual=NORMAL, Pred=NORMAL, Prob=0.4168 [OK]
+    4. Row 14901: Actual=NORMAL, Pred=NORMAL, Prob=0.4340 [OK]
+    5. Row 17393: Actual=FRAUD, Pred=FRAUD, Prob=0.5789 [OK]
+    6. Row 20641: Actual=NORMAL, Pred=FRAUD, Prob=0.5955 [WRONG]
+    7. Row 22246: Actual=NORMAL, Pred=NORMAL, Prob=0.4257 [OK]
+    8. Row 25848: Actual=NORMAL, Pred=FRAUD, Prob=0.5460 [WRONG]
+    9. Row 29776: Actual=FRAUD, Pred=NORMAL, Prob=0.4881 [WRONG]
+    10. Row 35022: Actual=NORMAL, Pred=NORMAL, Prob=0.4819 [OK]
+    11. Row 39725: Actual=NORMAL, Pred=FRAUD, Prob=0.5382 [WRONG]
+    12. Row 40501: Actual=NORMAL, Pred=NORMAL, Prob=0.4345 [OK]
+    13. Row 42135: Actual=FRAUD, Pred=NORMAL, Prob=0.4478 [WRONG]
+    14. Row 50870: Actual=NORMAL, Pred=NORMAL, Prob=0.4653 [OK]
+    15. Row 53977: Actual=FRAUD, Pred=NORMAL, Prob=0.4925 [WRONG]
+    16. Row 55501: Actual=NORMAL, Pred=NORMAL, Prob=0.4219 [OK]
+    17. Row 56235: Actual=FRAUD, Pred=NORMAL, Prob=0.4052 [WRONG]
+    18. Row 56968: Actual=NORMAL, Pred=FRAUD, Prob=0.5359 [WRONG]
+    19. Row 57103: Actual=FRAUD, Pred=FRAUD, Prob=0.5156 [OK]
+    20. Row 59360: Actual=NORMAL, Pred=NORMAL, Prob=0.4216 [OK]
+
+  Borderline transaction profile (mean of 20 transactions):
+    amt                           : 486.49
+    city_pop                      : 10342.15
+    hour                          : 15.80
+    month                         : 8.75
+    distance_cardholder_merchant  : 79.24
+    age                           : 38.75
+    is_weekend                    : 0.50
+    is_night                      : 0.95
+    velocity_1h                   : 1.65
+    velocity_24h                  : 5.00
+    amount_velocity_1h            : 794.64
+    category_encoded              : 8.50
+    gender_encoded                : 0.40
+    day_of_week_encoded           : 3.40
+
+  TEST 1E: PASS — 152 borderline cases found and analysed
+
+======================================================================
+GENERATING PLOT: Probability Distributions
+======================================================================
+  Saved: C:\Users\User\OneDrive\Desktop\FYP-Fraud-Detection\testing\results\probability_distributions.png
+
+======================================================================
+TEST SUITE 1 SUMMARY
+  Tests passed: 5/5
+  Tests failed: 0/5
+  Time: 6.7s
+======================================================================

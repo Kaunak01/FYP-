@@ -1,0 +1,102 @@
+{
+  "model": "ae_bds_xgboost_smote_tuned.joblib (19 features)",
+  "sample_size": 4645,
+  "sample_composition": "stratified: ~2500 fraud + 2500 normal",
+  "top_features": [
+    {
+      "rank": 1,
+      "feature": "amount_velocity_1h",
+      "mean_abs_shap": 2.3185484409332275
+    },
+    {
+      "rank": 2,
+      "feature": "is_night",
+      "mean_abs_shap": 1.9703058004379272
+    },
+    {
+      "rank": 3,
+      "feature": "amt",
+      "mean_abs_shap": 1.4160906076431274
+    },
+    {
+      "rank": 4,
+      "feature": "category_encoded",
+      "mean_abs_shap": 1.1769866943359375
+    },
+    {
+      "rank": 5,
+      "feature": "bds_amount",
+      "mean_abs_shap": 1.121352195739746
+    },
+    {
+      "rank": 6,
+      "feature": "hour",
+      "mean_abs_shap": 0.7180418372154236
+    },
+    {
+      "rank": 7,
+      "feature": "velocity_24h",
+      "mean_abs_shap": 0.6863481998443604
+    },
+    {
+      "rank": 8,
+      "feature": "recon_error",
+      "mean_abs_shap": 0.4769526422023773
+    },
+    {
+      "rank": 9,
+      "feature": "day_of_week_encoded",
+      "mean_abs_shap": 0.41872620582580566
+    },
+    {
+      "rank": 10,
+      "feature": "month",
+      "mean_abs_shap": 0.37827831506729126
+    },
+    {
+      "rank": 11,
+      "feature": "age",
+      "mean_abs_shap": 0.31047970056533813
+    },
+    {
+      "rank": 12,
+      "feature": "bds_category",
+      "mean_abs_shap": 0.2782769799232483
+    },
+    {
+      "rank": 13,
+      "feature": "city_pop",
+      "mean_abs_shap": 0.2574549913406372
+    },
+    {
+      "rank": 14,
+      "feature": "gender_encoded",
+      "mean_abs_shap": 0.24808672070503235
+    },
+    {
+      "rank": 15,
+      "feature": "is_weekend",
+      "mean_abs_shap": 0.18228060007095337
+    },
+    {
+      "rank": 16,
+      "feature": "velocity_1h",
+      "mean_abs_shap": 0.1750386655330658
+    },
+    {
+      "rank": 17,
+      "feature": "bds_time",
+      "mean_abs_shap": 0.138615682721138
+    },
+    {
+      "rank": 18,
+      "feature": "distance_cardholder_merchant",
+      "mean_abs_shap": 0.10346478968858719
+    },
+    {
+      "rank": 19,
+      "feature": "bds_freq",
+      "mean_abs_shap": 0.10251334309577942
+    }
+  ]
+}

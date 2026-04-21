@@ -1,0 +1,138 @@
+======================================================================
+TEST SUITE 3: DECISION BOUNDARY ANALYSIS
+======================================================================
+
+Median transaction probability: 0.000041
+Median transaction features:
+  amt                                 = 47.5200
+  city_pop                            = 2456.0000
+  hour                                = 14.0000
+  month                               = 6.0000
+  distance_cardholder_merchant        = 78.2318
+  age                                 = 44.0000
+  is_weekend                          = 0.0000
+  is_night                            = 0.0000
+  velocity_1h                         = 1.0000
+  velocity_24h                        = 4.0000
+  amount_velocity_1h                  = 54.2900
+  category_encoded                    = 6.0000
+  gender_encoded                      = 0.0000
+  day_of_week_encoded                 = 3.0000
+
+  amt:
+    Sweep range: [1.00, 28948.90]
+    Prob range: [0.0000, 0.0050] (delta=0.0050)
+    No boundary crossing (never crosses 0.5)
+
+  city_pop:
+    Sweep range: [23.00, 2906700.00]
+    Prob range: [0.0000, 0.0001] (delta=0.0001)
+    No boundary crossing (never crosses 0.5)
+
+  hour:
+    Sweep range: [0.00, 23.00]
+    Prob range: [0.0000, 0.0003] (delta=0.0002)
+    No boundary crossing (never crosses 0.5)
+
+  month:
+    Sweep range: [1.00, 12.00]
+    Prob range: [0.0000, 0.0001] (delta=0.0000)
+    No boundary crossing (never crosses 0.5)
+
+  distance_cardholder_merchant:
+    Sweep range: [0.02, 152.12]
+    Prob range: [0.0000, 0.0001] (delta=0.0000)
+    No boundary crossing (never crosses 0.5)
+
+  age:
+    Sweep range: [14.00, 96.00]
+    Prob range: [0.0000, 0.0001] (delta=0.0001)
+    No boundary crossing (never crosses 0.5)
+
+  is_weekend:
+    Sweep range: [0.00, 1.00]
+    Prob range: [0.0000, 0.0004] (delta=0.0004)
+    No boundary crossing (never crosses 0.5)
+
+  is_night:
+    Sweep range: [0.00, 1.00]
+    Prob range: [0.0000, 0.3678] (delta=0.3678)
+    No boundary crossing (never crosses 0.5)
+
+  velocity_1h:
+    Sweep range: [1.00, 7.00]
+    Prob range: [0.0000, 0.0051] (delta=0.0051)
+    No boundary crossing (never crosses 0.5)
+
+  velocity_24h:
+    Sweep range: [1.00, 36.00]
+    Prob range: [0.0000, 0.4510] (delta=0.4510)
+    No boundary crossing (never crosses 0.5)
+
+  amount_velocity_1h:
+    Sweep range: [1.00, 28948.90]
+    Prob range: [0.0001, 0.0026] (delta=0.0025)
+    No boundary crossing (never crosses 0.5)
+
+  category_encoded:
+    Sweep range: [0.00, 13.00]
+    Prob range: [0.0000, 0.0002] (delta=0.0002)
+    No boundary crossing (never crosses 0.5)
+
+  gender_encoded:
+    Sweep range: [0.00, 1.00]
+    Prob range: [0.0000, 0.0000] (delta=0.0000)
+    No boundary crossing (never crosses 0.5)
+
+  day_of_week_encoded:
+    Sweep range: [0.00, 6.00]
+    Prob range: [0.0000, 0.0001] (delta=0.0001)
+    No boundary crossing (never crosses 0.5)
+
+======================================================================
+DECISION BOUNDARY SUMMARY
+======================================================================
+
+Feature                               Boundary  Z-Score  ProbRange Interpretation
+----------------------------------------------------------------------------------------------------
+amt                                        N/A      N/A     0.0050 Cannot flip prediction alone
+city_pop                                   N/A      N/A     0.0001 Cannot flip prediction alone
+hour                                       N/A      N/A     0.0002 Cannot flip prediction alone
+month                                      N/A      N/A     0.0000 Cannot flip prediction alone
+distance_cardholder_merchant               N/A      N/A     0.0000 Cannot flip prediction alone
+age                                        N/A      N/A     0.0001 Cannot flip prediction alone
+is_weekend                                 N/A      N/A     0.0004 Cannot flip prediction alone
+is_night                                   N/A      N/A     0.3678 Cannot flip prediction alone
+velocity_1h                                N/A      N/A     0.0051 Cannot flip prediction alone
+velocity_24h                               N/A      N/A     0.4510 Cannot flip prediction alone
+amount_velocity_1h                         N/A      N/A     0.0025 Cannot flip prediction alone
+category_encoded                           N/A      N/A     0.0002 Cannot flip prediction alone
+gender_encoded                             N/A      N/A     0.0000 Cannot flip prediction alone
+day_of_week_encoded                        N/A      N/A     0.0001 Cannot flip prediction alone
+
+Features that can individually flip prediction: 0/14
+
+Feature influence ranking (by probability range when varied alone):
+   1. velocity_24h                        range=0.4510
+   2. is_night                            range=0.3678
+   3. velocity_1h                         range=0.0051
+   4. amt                                 range=0.0050
+   5. amount_velocity_1h                  range=0.0025
+   6. is_weekend                          range=0.0004
+   7. hour                                range=0.0002
+   8. category_encoded                    range=0.0002
+   9. age                                 range=0.0001
+  10. city_pop                            range=0.0001
+  11. day_of_week_encoded                 range=0.0001
+  12. month                               range=0.0000
+  13. distance_cardholder_merchant        range=0.0000
+  14. gender_encoded                      range=0.0000
+
+  TEST SUITE 3: PASS - All 14 feature sweeps completed without errors
+
+======================================================================
+TEST SUITE 3 SUMMARY
+  Tests passed: 1/1
+  Time: 8.6s
+  Plots saved: all_boundaries.png + 14 individual boundary_*.png
+======================================================================

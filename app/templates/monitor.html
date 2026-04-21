@@ -1,0 +1,1089 @@
+{% extends "base.html" %}
+{% block title %}Live Monitor{% endblock %}
+{% block content %}
+<style>
+/* ---- Inject Attack Button ---- */
+@keyframes inject-pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(231,76,60,0.7); }
+    70%  { box-shadow: 0 0 0 10px rgba(231,76,60,0); }
+    100% { box-shadow: 0 0 0 0 rgba(231,76,60,0); }
+}
+#btn-inject { animation: inject-pulse 2s infinite; }
+#btn-inject:disabled { animation: none; opacity: 0.45; }
+
+/* ---- Injected attack feed item ---- */
+.live-feed-item.injected {
+    border-left: 4px solid #e74c3c;
+    background: rgba(231,76,60,0.08) !important;
+    animation: attack-flash 0.4s ease-out;
+}
+@keyframes attack-flash {
+    0%   { background: rgba(231,76,60,0.35) !important; }
+    100% { background: rgba(231,76,60,0.08) !important; }
+}
+
+/* ---- Attack overlay (full-screen dramatic flash) ---- */
+#attack-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(231,76,60,0.18);
+    pointer-events: none;
+    animation: overlay-flash 0.6s ease-out forwards;
+}
+@keyframes overlay-flash {
+    0%   { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+/* ---- Attack toast ---- */
+#attack-toast {
+    display: none;
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: #e74c3c; color: #fff;
+    padding: 12px 28px; border-radius: 10px;
+    font-size: 1rem; font-weight: 700;
+    box-shadow: 0 4px 24px rgba(231,76,60,0.5);
+    z-index: 10000;
+    white-space: nowrap;
+    animation: toast-in 0.3s ease-out;
+}
+@keyframes toast-in {
+    0%   { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ---- Compare Mode Cards ---- */
+.compare-card { background: var(--card-bg); border-radius: 8px; border: 1px solid var(--border); margin-bottom: 6px; overflow: hidden; font-size: 0.8rem; }
+.compare-card.actual-fraud { border-left: 3px solid #e74c3c; }
+.compare-card-header { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.compare-cols { display: grid; grid-template-columns: repeat(4, 1fr); }
+.compare-col { padding: 8px 6px; text-align: center; border-right: 1px solid var(--border); transition: background 0.15s; }
+.compare-col:last-child { border-right: none; }
+.compare-col.dec-FRAUD  { background: rgba(231,76,60,0.09); }
+.compare-col.dec-REVIEW { background: rgba(243,156,18,0.09); }
+.compare-col.dec-NORMAL { background: rgba(46,204,113,0.06); }
+.compare-col.best-col   { box-shadow: inset 0 0 0 2px var(--accent,#e67e22); }
+.cm-name   { font-size: 0.68rem; font-weight: 700; color: var(--text-muted); margin-bottom: 2px; }
+.cm-prob   { font-size: 1.05rem; font-weight: 700; font-family: var(--mono); }
+.cm-bar    { height: 3px; background: var(--border); border-radius: 2px; margin: 4px 2px; }
+.cm-fill   { height: 100%; border-radius: 2px; transition: width 0.2s; }
+.cm-dec    { font-size: 0.68rem; font-weight: 700; margin-top: 2px; }
+.cm-verdict{ font-size: 0.65rem; margin-top: 2px; }
+/* Compare Stats Table */
+.cmp-stats-table th, .cmp-stats-table td { font-size: 0.78rem; padding: 4px 8px; }
+.cmp-stats-table .highlight { color: var(--accent,#e67e22); font-weight: 700; }
+
+/* ---- Cardholder History Modal ---- */
+#ch-modal { display:none; position:fixed; inset:0; z-index:9990; background:rgba(0,0,0,0.72); align-items:center; justify-content:center; padding:16px; }
+#ch-modal-inner { background:var(--card-bg,#fff); border-radius:12px; width:95%; max-width:900px; max-height:92vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+.ch-header { display:flex; align-items:center; gap:10px; padding:14px 20px; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--card-bg,#fff); z-index:1; }
+.ch-header h5 { margin:0; font-size:0.95rem; }
+.ch-close-btn { margin-left:auto; background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-muted); line-height:1; padding:0 4px; }
+.ch-body { padding:18px 20px; }
+.ch-summary-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:18px; }
+.ch-stat { background:var(--bg,#f8f9fa); border:1px solid var(--border); border-radius:8px; padding:10px; text-align:center; }
+.ch-stat-val { font-size:1.05rem; font-weight:700; font-family:var(--mono); }
+.ch-stat-lbl { font-size:0.68rem; color:var(--text-muted); margin-top:2px; }
+.ch-section { margin-bottom:18px; }
+.ch-section h6 { font-size:0.78rem; font-weight:700; margin-bottom:7px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; }
+.ch-vel-box { background:#fffbeb; border:1px solid #fcd34d; border-radius:8px; padding:10px 14px; }
+.ch-vel-row { display:flex; justify-content:space-between; padding:3px 0; font-size:0.82rem; }
+.ch-vel-row.ch-danger { color:#dc2626; font-weight:700; }
+.ch-spike-badge { background:#fecaca; color:#dc2626; padding:1px 6px; border-radius:4px; font-size:0.7rem; margin-left:5px; font-weight:700; }
+.ch-attack-badge { background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; padding:3px 9px; border-radius:6px; font-size:0.75rem; font-weight:600; }
+.ch-attack-marker td { background:#fef2f2; color:#dc2626; font-weight:700; text-align:center; padding:5px; border:2px dashed #ef4444; font-size:0.78rem; }
+.ch-row-fraud { border-left:3px solid #ef4444; }
+.ch-txn-table { width:100%; border-collapse:collapse; }
+.ch-txn-table th { background:var(--bg,#f8f9fa); padding:5px 8px; text-align:left; font-size:0.7rem; color:var(--text-muted); font-weight:600; border-bottom:1px solid var(--border); position:sticky; top:0; }
+.ch-txn-table td { padding:5px 8px; border-bottom:1px solid var(--border,#eee); font-size:0.78rem; }
+.ch-txn-table tr:hover td { background:rgba(0,0,0,0.03); }
+.ch-breakdown-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.ch-chart-box { background:var(--bg,#f8f9fa); border:1px solid var(--border); border-radius:8px; padding:12px; }
+.ch-chart-box h6 { font-size:0.75rem; font-weight:700; margin-bottom:8px; color:var(--text-muted); }
+.card-badge { display:inline-block; background:rgba(52,152,219,0.12); color:#3498db; border:1px solid rgba(52,152,219,0.3); border-radius:4px; padding:0 5px; font-size:0.7rem; font-family:var(--mono); cursor:pointer; margin-left:5px; white-space:nowrap; vertical-align:middle; }
+.card-badge:hover { background:rgba(52,152,219,0.28); }
+</style>
+
+<div class="page-header">
+    <h4>Live Monitor</h4>
+    <div class="subtitle">Watch FraudLens process transactions in real-time</div>
+</div>
+
+<!-- Control bar -->
+<div class="card p-3 mb-3">
+    <!-- Row 1: Model + Dataset + Compare toggle -->
+    <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <label class="text-muted mb-0" style="white-space:nowrap;font-size:0.82rem;">Model:</label>
+            <select id="model-select" class="form-select form-select-sm" style="min-width:240px;" onchange="switchModel(this.value)">
+                <option value="xgboost_baseline">XGBoost Baseline (F1: 0.52)</option>
+                <option value="xgboost_smote">XGBoost + SMOTE (F1: 0.87)</option>
+                <option value="ae_xgboost">Autoencoder + XGBoost (F1: 0.87)</option>
+                <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.87) ★ Best</option>
+            </select>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <label class="text-muted mb-0" style="white-space:nowrap;font-size:0.82rem;">Dataset:</label>
+            <select id="dataset-select" class="form-select form-select-sm" style="min-width:300px;">
+                <option value="demo">Demo Transactions (102 rows) — Quick Test</option>
+                <option value="sim10k">Simulation 10K (10,000 rows, ~41 frauds)</option>
+                <option value="sim20k">Simulation 20K (20,000 rows, ~120 frauds)</option>
+                <option value="sim50k">Simulation 50K (50,000 rows, ~300 frauds)</option>
+            </select>
+        </div>
+        <span id="model-switch-status" class="text-muted" style="font-size:0.78rem;"></span>
+        <!-- Compare toggle -->
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" id="compare-toggle" onchange="toggleCompareMode()">
+                <label class="form-check-label text-muted mb-0" for="compare-toggle" style="font-size:0.82rem;white-space:nowrap;cursor:pointer;">Compare All Models</label>
+            </div>
+        </div>
+    </div>
+    <!-- Row 2: Playback controls -->
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <button class="btn btn-fraudlens" id="btn-start" onclick="startSimulation()">Start Demo</button>
+        <button class="btn btn-outline-secondary" id="btn-pause" onclick="pauseSimulation()" disabled>Pause</button>
+        <button class="btn btn-outline-warning" id="btn-skip" onclick="skipToAlert()" disabled>Skip to Next Alert</button>
+        <button class="btn btn-outline-danger" onclick="resetSimulation()">Reset</button>
+        <button class="btn btn-danger" id="btn-inject" onclick="injectAttack()" disabled title="Inject a synthetic fraud attack burst into the live stream">
+            ⚡ Inject Attack
+        </button>
+        <div class="d-flex align-items-center gap-2 ms-auto">
+            <small class="text-muted">Speed:</small>
+            <input type="range" class="form-range" style="width:120px;" id="speed-slider" min="0" max="20" value="10">
+            <small class="text-muted" id="speed-label">0.5s</small>
+        </div>
+    </div>
+    <div class="progress mt-2" style="height:6px;">
+        <div class="progress-bar bg-primary" id="sim-progress" style="width:0%"></div>
+    </div>
+    <small class="text-muted" id="sim-counter">Ready — select model and dataset, then press Start</small>
+</div>
+
+<div class="row g-3" id="main-row">
+    <!-- Live feed — full width in compare mode, half-width normally -->
+    <div id="feed-col" class="col-md-6">
+        <div class="card p-3">
+            <h6 id="feed-title">Transaction Feed</h6>
+            <div class="live-feed" id="live-feed"></div>
+        </div>
+    </div>
+
+    <!-- Stats + Chart — hidden in compare mode -->
+    <div id="stats-col" class="col-md-6">
+        <div class="row g-3 mb-3">
+            <div class="col-6"><div class="stat-card info"><div class="stat-value fs-5" id="m-processed">0</div><div class="stat-label">Processed</div></div></div>
+            <div class="col-6"><div class="stat-card fraud"><div class="stat-value fs-5" id="m-alerts">0</div><div class="stat-label">Alerts</div></div></div>
+            <div class="col-6"><div class="stat-card safe"><div class="stat-value fs-5" id="m-saved">$0</div><div class="stat-label">Saved</div></div></div>
+            <div class="col-6"><div class="stat-card review"><div class="stat-value fs-5" id="m-fp">0</div><div class="stat-label">False Alarms</div></div></div>
+        </div>
+        <div class="card p-3">
+            <h6>Alert Timeline</h6>
+            <div class="chart-container" style="height:200px;">
+                <canvas id="timeline-chart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Compare Stats Panel (shown only in compare mode) -->
+<div id="compare-stats-panel" class="card p-3 mt-3" style="display:none;">
+    <h6 style="font-size:0.85rem;font-weight:700;">Model Comparison Stats</h6>
+    <div class="table-responsive">
+        <table class="table table-sm cmp-stats-table" id="compare-stats-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>XGBoost Base <small class="text-muted">F1:0.52</small></th>
+                    <th>XGBoost+SMOTE <small class="text-muted">F1:0.87</small></th>
+                    <th>AE+XGBoost <small class="text-muted">F1:0.87</small></th>
+                    <th class="highlight">AE+BDS+XGBoost ★ <small>F1:0.87</small></th>
+                </tr>
+            </thead>
+            <tbody id="compare-stats-body">
+                <tr><td colspan="5" class="text-muted text-center" style="font-size:0.8rem;">Start simulation to see per-model stats</td></tr>
+            </tbody>
+        </table>
+    </div>
+    <div id="compare-insight" class="text-muted mt-1" style="font-size:0.8rem;"></div>
+</div>
+
+<!-- Narration overlay -->
+<div id="narration-panel" class="card p-3 mt-3" style="display:none; border-left:4px solid var(--accent);">
+    <div class="d-flex align-items-start gap-2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        <div id="narration-text" class="fw-500"></div>
+    </div>
+</div>
+
+<!-- Latest alert detail (hidden in compare mode) -->
+<div id="latest-alert" class="card p-3 mt-3" style="display:none;">
+    <h6>Latest Alert</h6>
+    <div id="latest-alert-content"></div>
+</div>
+
+<!-- Attack overlay + toast -->
+<div id="attack-overlay"></div>
+<div id="attack-toast">⚡ ATTACK INJECTED — Fraud burst detected!</div>
+
+<!-- Cardholder History Modal -->
+<div id="ch-modal" role="dialog" aria-modal="true" onclick="if(event.target===this)closeCardHistoryModal()">
+    <div id="ch-modal-inner">
+        <div class="ch-header">
+            <h5>Cardholder History</h5>
+            <span id="ch-attack-badge" class="ch-attack-badge" style="display:none;"></span>
+            <span style="font-size:1rem;font-weight:700;font-family:var(--mono);" id="ch-card-id"></span>
+            <button class="ch-close-btn" onclick="closeCardHistoryModal()" aria-label="Close">&times;</button>
+        </div>
+        <div class="ch-body">
+            <div id="ch-loading" class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+                <p class="text-muted mt-2 mb-0" style="font-size:0.85rem;">Loading card history...</p>
+            </div>
+            <div id="ch-error" class="alert alert-danger py-2" style="display:none;font-size:0.85rem;"></div>
+            <div id="ch-content" style="display:none;">
+                <!-- Summary stats -->
+                <div class="ch-summary-grid">
+                    <div class="ch-stat"><div class="ch-stat-val" id="ch-total-txns">—</div><div class="ch-stat-lbl">Total Txns</div></div>
+                    <div class="ch-stat"><div class="ch-stat-val" id="ch-total-spent">—</div><div class="ch-stat-lbl">Total Spent</div></div>
+                    <div class="ch-stat"><div class="ch-stat-val" id="ch-avg-amount">—</div><div class="ch-stat-lbl">Avg Amount</div></div>
+                    <div class="ch-stat"><div class="ch-stat-val" id="ch-fraud-count" style="color:#e74c3c;">—</div><div class="ch-stat-lbl">Alerts</div></div>
+                    <div class="ch-stat"><div class="ch-stat-val" id="ch-first-seen" style="font-size:0.82rem;">—</div><div class="ch-stat-lbl">First Seen</div></div>
+                </div>
+                <!-- Spending chart -->
+                <div class="ch-section">
+                    <h6>Spending Pattern</h6>
+                    <div style="height:175px;"><canvas id="ch-spending-chart"></canvas></div>
+                </div>
+                <!-- Velocity analysis -->
+                <div class="ch-section">
+                    <h6>Velocity Analysis</h6>
+                    <div class="ch-vel-box" id="ch-velocity"></div>
+                </div>
+                <!-- Transaction history table -->
+                <div class="ch-section">
+                    <h6>Transaction History <small class="text-muted fw-normal ms-1">(click row for SHAP explanation)</small></h6>
+                    <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+                        <table class="ch-txn-table">
+                            <thead><tr>
+                                <th>#</th><th>Date/Time</th><th>Amount</th><th>Category</th><th>Prob</th><th>Decision</th><th>Vel/hr</th>
+                            </tr></thead>
+                            <tbody id="ch-txn-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <!-- Category + Time breakdown -->
+                <div class="ch-breakdown-row">
+                    <div class="ch-chart-box">
+                        <h6>Category Breakdown</h6>
+                        <div style="height:155px;"><canvas id="ch-category-chart"></canvas></div>
+                    </div>
+                    <div class="ch-chart-box">
+                        <h6>Time of Day Distribution</h6>
+                        <div style="height:155px;"><canvas id="ch-time-chart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ---- State ----
+let fetchController = null;
+let paused = false;
+let eventQueue = [];
+let displayTimer = null;
+let simulationDone = false;
+let simTotal = 0;
+let alertCount = 0;
+let processedCount = 0;
+let moneySaved = 0;
+let fpCount = 0;
+let alertTimeline = [];
+let timelineChart = null;
+
+// ---- Compare Mode State ----
+let compareMode = false;
+const CMP_CODES  = ['xgboost_baseline','xgboost_smote','ae_xgboost','ae_bds_xgboost'];
+const CMP_LABELS = {'xgboost_baseline':'XGBoost Base','xgboost_smote':'XGBoost+SMOTE','ae_xgboost':'AE+XGBoost','ae_bds_xgboost':'AE+BDS+XGBoost ★'};
+const CMP_COLORS = {'FRAUD':'#e74c3c','REVIEW':'#f39c12','NORMAL':'#2ecc71'};
+let cmpStats = {};
+
+function _resetCmpStats() {
+    cmpStats = {};
+    CMP_CODES.forEach(c => { cmpStats[c] = {flagged:0, tp:0, fp:0, fn:0, tn:0}; });
+}
+_resetCmpStats();
+
+// ---- Speed slider ----
+// Backend always streams at full speed (delay=0).
+// The slider only controls how fast the frontend drains the queue.
+document.getElementById('speed-slider').addEventListener('input', function() {
+    updateSpeedLabel();
+    if (displayTimer !== null) restartDisplayTimer();
+});
+
+function getDisplayDelay() {
+    const val = parseInt(document.getElementById('speed-slider').value);
+    return val >= 20 ? 0 : (20 - val) / 10;   // 0 → 2.0s  (20 = max speed)
+}
+
+function updateSpeedLabel() {
+    const d = getDisplayDelay();
+    document.getElementById('speed-label').textContent = d === 0 ? 'Max' : d.toFixed(1) + 's';
+}
+
+function startDisplayTimer() {
+    const d = getDisplayDelay();
+    const ms = d === 0 ? 50 : Math.round(d * 1000);
+    displayTimer = setInterval(processQueuedEvents, ms);
+}
+
+function restartDisplayTimer() {
+    clearInterval(displayTimer);
+    displayTimer = null;
+    startDisplayTimer();
+}
+
+function processQueuedEvents() {
+    if (paused) return;
+    if (eventQueue.length === 0) {
+        if (simulationDone) finishSimulation();
+        return;
+    }
+    // At max speed process a larger batch per tick to keep up with the stream
+    const batchSize = getDisplayDelay() === 0 ? 20 : 1;
+    for (let i = 0; i < batchSize && eventQueue.length > 0; i++) {
+        handleEvent(eventQueue.shift());
+    }
+}
+
+function finishSimulation() {
+    clearInterval(displayTimer); displayTimer = null;
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-pause').disabled = true;
+    document.getElementById('btn-skip').disabled = true;
+    document.getElementById('btn-inject').disabled = true;
+
+    if (compareMode) {
+        _renderCmpStats();
+        const bdsTp  = (cmpStats['ae_bds_xgboost']||{}).tp || 0;
+        const baseTp = (cmpStats['xgboost_baseline']||{}).tp || 0;
+        document.getElementById('sim-counter').textContent =
+            `Complete! ${processedCount} processed — AE+BDS: ${bdsTp} fraud caught, Baseline: ${baseTp}`;
+        // Append summary card to feed
+        const summary = document.createElement('div');
+        summary.className = 'compare-card';
+        summary.style.background = 'rgba(231,76,60,0.05)';
+        summary.innerHTML = `<div class="compare-card-header" style="font-weight:700;">
+            Simulation Complete — ${processedCount} transactions processed
+            &nbsp;|&nbsp; AE+BDS caught <span style="color:#e74c3c">${bdsTp}</span> frauds
+            vs Baseline <span style="color:#aaa">${baseTp}</span>
+            &nbsp;|&nbsp; Difference: <span style="color:var(--accent);font-weight:800;">+${bdsTp - baseTp}</span>
+        </div>`;
+        document.getElementById('live-feed').insertBefore(summary, document.getElementById('live-feed').firstChild);
+    } else {
+        document.getElementById('sim-counter').textContent =
+            `Complete! ${processedCount} processed, ${alertCount} alerts`;
+    }
+}
+
+// ---- Compare Mode Toggle ----
+function toggleCompareMode() {
+    compareMode = document.getElementById('compare-toggle').checked;
+    const modelSel = document.getElementById('model-select');
+    const feedCol  = document.getElementById('feed-col');
+    const statsCol = document.getElementById('stats-col');
+    const cmpPanel = document.getElementById('compare-stats-panel');
+    const latestAlert = document.getElementById('latest-alert');
+    const feedTitle = document.getElementById('feed-title');
+
+    if (compareMode) {
+        modelSel.disabled = true;
+        feedCol.className  = 'col-12';
+        statsCol.style.display = 'none';
+        cmpPanel.style.display = 'block';
+        latestAlert.style.display = 'none';
+        feedTitle.textContent = 'Transaction Feed — Compare Mode (4 models per transaction)';
+        showToast('Compare Mode ON — all 4 models run per transaction (slightly slower)', 'info');
+    } else {
+        modelSel.disabled = false;
+        feedCol.className  = 'col-md-6';
+        statsCol.style.display = '';
+        cmpPanel.style.display = 'none';
+        feedTitle.textContent = 'Transaction Feed';
+    }
+    // Clear feed when toggling
+    document.getElementById('live-feed').innerHTML = '';
+    _resetCmpStats();
+    _renderCmpStats();
+}
+
+// ---- Model selector ----
+function switchModel(code) {
+    const status = document.getElementById('model-switch-status');
+    status.textContent = 'Switching...';
+    fetch('/api/model/switch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({model: code})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.display_name) {
+            status.textContent = '✓ ' + d.display_name;
+            const mb = document.getElementById('active-model-badge');
+            if (mb) mb.textContent = 'Model: ' + d.display_name;
+            setTimeout(() => { status.textContent = ''; }, 3000);
+        } else {
+            status.textContent = '✗ ' + (d.error || 'Failed');
+        }
+    })
+    .catch(() => { status.textContent = '✗ Network error'; });
+}
+
+// ---- Page init ----
+(function() {
+    fetch('/api/simulation/datasets').then(r => r.json()).then(d => {
+        const sel = document.getElementById('dataset-select');
+        d.datasets.forEach(ds => {
+            for (let opt of sel.options) {
+                if (opt.value === ds.key && !ds.available) {
+                    opt.disabled = true;
+                    opt.text += ' (not found)';
+                }
+            }
+        });
+    }).catch(() => {});
+    const msel = document.getElementById('model-select');
+    if (msel) switchModel(msel.value);
+    updateSpeedLabel();
+})();
+
+// ---- Simulation start ----
+function startSimulation() {
+    const dataset = document.getElementById('dataset-select').value;
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-pause').disabled = false;
+    document.getElementById('btn-skip').disabled = false;
+    document.getElementById('btn-inject').disabled = false;
+    simulationDone = false;
+    eventQueue = [];
+    simTotal = 0;
+
+    fetchController = new AbortController();
+
+    // Always request delay:0 — display speed is controlled frontend-side
+    fetch('/api/simulation/start', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({delay: 0, dataset: dataset, compare: compareMode}),
+        signal: fetchController.signal
+    }).then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+
+        function read() {
+            reader.read().then(({done, value}) => {
+                if (done) { simulationDone = true; return; }
+                buf += decoder.decode(value, {stream: true});
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                lines.forEach(line => {
+                    if (line.startsWith('event:')) return;
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const data = JSON.parse(line.substring(6));
+                            if (data.event === 'start') return;
+                            if (data.total) simTotal = data.total;
+                            eventQueue.push(data);
+                        } catch(e) {}
+                    }
+                });
+                read();
+            }).catch(() => { simulationDone = true; });
+        }
+        read();
+    }).catch(() => {});
+
+    startDisplayTimer();
+}
+
+// ---- Event rendering ----
+function handleEvent(data) {
+    if (data.total_processed !== undefined && !data.sequence) return;
+
+    processedCount = data.sequence;
+    const total = data.total || simTotal || 1;
+    document.getElementById('sim-progress').style.width = (data.sequence / total * 100).toFixed(0) + '%';
+    document.getElementById('sim-counter').textContent = `Transaction ${data.sequence} of ${total}`;
+    document.getElementById('m-processed').textContent = processedCount;
+
+    if (data.is_alert) {
+        alertCount++;
+        moneySaved += data.amount;
+        if (data.actual_is_fraud === 0) fpCount++;
+    }
+    document.getElementById('m-alerts').textContent = alertCount;
+    document.getElementById('m-saved').textContent = '$' + moneySaved.toLocaleString('en-US', {maximumFractionDigits: 0});
+    document.getElementById('m-fp').textContent = fpCount;
+
+    const feed = document.getElementById('live-feed');
+
+    if (compareMode && data.compare_predictions) {
+        // ---- Compare Mode: render 4-column card ----
+        _updateCmpStats(data);
+        const item = _createCompareCard(data);
+        feed.insertBefore(item, feed.firstChild);
+        if (feed.children.length > 20) feed.removeChild(feed.lastChild);
+        // Update stats table every 10 events to avoid DOM thrash
+        if (processedCount % 10 === 0) _renderCmpStats();
+    } else {
+        // ---- Normal Mode: single-model row ----
+        const item = document.createElement('div');
+        const cls = data.classification === 'FRAUD' ? 'fraud' : data.classification === 'REVIEW' ? 'review' : '';
+        const injectedCls = data.injected ? ' injected' : '';
+        item.className = 'live-feed-item ' + cls + injectedCls;
+        item.style.cursor = 'pointer';
+        item.title = 'Click to see SHAP explanation';
+        const probColor = data.probability >= 0.8 ? '#e74c3c' : data.probability >= 0.5 ? '#f39c12' : '#2ecc71';
+        const explainHint = data.is_alert
+            ? '<span style="font-size:0.7rem;color:var(--text-muted);margin-left:4px;" title="Click to explain">&#9432;</span>'
+            : '';
+        const cardBadge = data.card_number
+            ? `<span class="card-badge" onclick="event.stopPropagation();showCardHistory('${data.card_number}')" title="View card history">****${String(data.card_number).slice(-4)}</span>`
+            : '';
+        const injectedBadge = data.injected
+            ? '<span class="badge bg-danger ms-2" style="font-size:0.65rem;vertical-align:middle;">⚡ INJECTED ATTACK</span>'
+            : '';
+        item.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <span><strong>${data.transaction_id}</strong>${cardBadge}${injectedBadge} $${data.amount.toFixed(2)} - ${data.category}${explainHint}</span>
+                <span style="font-family:var(--mono);color:${probColor};font-weight:600;">${(data.probability*100).toFixed(1)}%</span>
+            </div>`;
+        if (data.features) {
+            const fc = Object.assign({}, data.features);
+            item.onclick = () => showExplanationModal(fc, {
+                transaction_id: data.transaction_id, amount: data.amount,
+                category: data.category, hour: data.hour,
+                probability: data.probability, classification: data.classification,
+            });
+        }
+        feed.insertBefore(item, feed.firstChild);
+        if (feed.children.length > 30) feed.removeChild(feed.lastChild);
+
+        // Show dramatic overlay for injected attack transactions
+        if (data.injected) {
+            showAttackOverlay(data);
+        }
+
+        alertTimeline.push(data.is_alert ? 1 : 0);
+        updateTimeline();
+
+        if (data.narration) {
+            document.getElementById('narration-text').textContent = data.narration;
+            const panel = document.getElementById('narration-panel');
+            panel.style.display = 'block';
+            setTimeout(() => { panel.style.display = 'none'; }, 8000);
+        }
+        if (data.is_alert) {
+            document.getElementById('latest-alert').style.display = 'block';
+            const correct = data.correct
+                ? '<span class="badge bg-success">Correct</span>'
+                : '<span class="badge bg-danger">Wrong</span>';
+            document.getElementById('latest-alert-content').innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${data.transaction_id}</strong> - $${data.amount.toFixed(2)}
+                        <span class="badge badge-${data.risk_level} ms-2">${data.risk_level}</span>
+                        <span class="badge badge-${data.classification} ms-1">${data.classification}</span>
+                        ${correct}
+                    </div>
+                    <span style="font-family:var(--mono);font-size:1.5rem;font-weight:700;color:#e74c3c;">${(data.probability*100).toFixed(1)}%</span>
+                </div>
+                ${data.rule_triggers.length > 0 ? '<div class="mt-1"><small class="text-muted">Rules: ' + data.rule_triggers.join(', ') + '</small></div>' : ''}`;
+            showToast(`ALERT: $${data.amount.toFixed(2)} flagged as ${data.classification}`, 'fraud');
+        }
+    }
+}
+
+// ---- Compare Mode Helpers ----
+function _createCompareCard(data) {
+    const preds = data.compare_predictions;
+    const isActualFraud = data.actual_is_fraud === 1;
+
+    // Determine disagreement: do all models agree on FRAUD vs not-FRAUD?
+    const decisions = CMP_CODES.map(c => preds[c] ? preds[c].decision : 'N/A');
+    const allSame   = decisions.every(d => d === decisions[0]);
+    const bdsResult = preds['ae_bds_xgboost'];
+    const baseResult= preds['xgboost_baseline'];
+    const bdsCatchesOnly = bdsResult && bdsResult.decision === 'FRAUD' &&
+                           baseResult && baseResult.decision !== 'FRAUD';
+
+    const card = document.createElement('div');
+    card.className = 'compare-card' + (isActualFraud ? ' actual-fraud' : '');
+
+    // Header
+    const cmpCardBadge = data.card_number
+        ? `<span class="card-badge" onclick="event.stopPropagation();showCardHistory('${data.card_number}')" title="View card history">****${String(data.card_number).slice(-4)}</span>`
+        : '';
+    let headerHTML = `
+        <strong style="font-family:var(--mono);font-size:0.8rem;">${data.transaction_id}</strong>
+        ${cmpCardBadge}
+        <span>$${data.amount.toFixed(2)}</span>
+        <span class="text-muted">${data.category}</span>
+        <span class="text-muted">${data.hour}:00</span>`;
+    if (isActualFraud)
+        headerHTML += `<span class="badge bg-danger ms-1" style="font-size:0.65rem;">ACTUAL FRAUD</span>`;
+    if (!allSame && bdsCatchesOnly)
+        headerHTML += `<span class="badge ms-1" style="background:var(--accent);font-size:0.65rem;">Only BDS caught this</span>`;
+    else if (!allSame)
+        headerHTML += `<span class="badge bg-secondary ms-1" style="font-size:0.65rem;">Models disagree</span>`;
+    else if (decisions[0] === 'FRAUD')
+        headerHTML += `<span class="badge bg-danger ms-1" style="font-size:0.65rem;">All agree: FRAUD</span>`;
+
+    card.innerHTML = `<div class="compare-card-header">${headerHTML}</div><div class="compare-cols"></div>`;
+    const cols = card.querySelector('.compare-cols');
+
+    CMP_CODES.forEach((code, idx) => {
+        const pred = preds[code];
+        if (!pred) return;
+        const prob  = pred.probability;
+        const dec   = pred.decision;
+        const color = CMP_COLORS[dec] || '#aaa';
+        const isBest= code === 'ae_bds_xgboost';
+
+        // Verdict vs actual
+        let verdict = '';
+        if (isActualFraud) {
+            if (dec === 'FRAUD') verdict = '<span style="color:#2ecc71;font-weight:700;">TP</span>';
+            else verdict = '<span style="color:#e74c3c;font-weight:700;">FN</span>';
+        } else if (dec === 'FRAUD') {
+            verdict = '<span style="color:#f39c12;font-weight:700;">FP</span>';
+        }
+
+        const col = document.createElement('div');
+        col.className = `compare-col dec-${dec}${isBest ? ' best-col' : ''}`;
+        col.innerHTML = `
+            <div class="cm-name">${CMP_LABELS[code]}</div>
+            <div class="cm-prob" style="color:${color};">${(prob*100).toFixed(1)}%</div>
+            <div class="cm-bar"><div class="cm-fill" style="width:${(prob*100).toFixed(0)}%;background:${color};"></div></div>
+            <div class="cm-dec" style="color:${color};">${dec}</div>
+            <div class="cm-verdict">${verdict}</div>`;
+
+        // SHAP click on compare card col
+        if (data.features) {
+            col.style.cursor = 'pointer';
+            col.title = 'Click to explain with SHAP';
+            const fc = Object.assign({}, data.features);
+            col.onclick = (e) => {
+                e.stopPropagation();
+                showExplanationModal(fc, {
+                    transaction_id: data.transaction_id, amount: data.amount,
+                    category: data.category, hour: data.hour,
+                    probability: prob, classification: dec,
+                });
+            };
+        }
+        cols.appendChild(col);
+    });
+    return card;
+}
+
+function _updateCmpStats(data) {
+    const preds = data.compare_predictions;
+    if (!preds) return;
+    const isActualFraud = data.actual_is_fraud === 1;
+    CMP_CODES.forEach(code => {
+        const pred = preds[code];
+        if (!pred || !cmpStats[code]) return;
+        const isFlagged = pred.decision === 'FRAUD' || pred.decision === 'REVIEW';
+        if (isFlagged) cmpStats[code].flagged++;
+        if (isActualFraud) {
+            if (isFlagged) cmpStats[code].tp++;
+            else            cmpStats[code].fn++;
+        } else {
+            if (isFlagged) cmpStats[code].fp++;
+            else            cmpStats[code].tn++;
+        }
+    });
+}
+
+function _renderCmpStats() {
+    const tbody = document.getElementById('compare-stats-body');
+    if (!tbody) return;
+    const rows = [
+        ['Processed', _ => processedCount],
+        ['Flagged (F+R)', s => s.flagged],
+        ['True Positives', s => s.tp],
+        ['False Positives', s => s.fp],
+        ['False Negatives', s => s.fn],
+        ['Precision', s => { const d = s.tp+s.fp; return d ? (s.tp/d*100).toFixed(0)+'%' : '-'; }],
+        ['Recall',    s => { const d = s.tp+s.fn; return d ? (s.tp/d*100).toFixed(0)+'%' : '-'; }],
+    ];
+    tbody.innerHTML = rows.map(([label, fn]) =>
+        `<tr><td class="text-muted">${label}</td>${CMP_CODES.map(c =>
+            `<td${c==='ae_bds_xgboost'?' class="highlight"':''}>${fn(cmpStats[c]||{})}</td>`
+        ).join('')}</tr>`
+    ).join('');
+
+    // Insight text
+    const bdsTp = (cmpStats['ae_bds_xgboost']||{}).tp || 0;
+    const baseTp= (cmpStats['xgboost_baseline']||{}).tp || 0;
+    const diff  = bdsTp - baseTp;
+    const ins   = document.getElementById('compare-insight');
+    if (ins && diff > 0)
+        ins.textContent = `AE+BDS+XGBoost has caught ${diff} more fraud${diff>1?'s':''} than XGBoost Baseline so far.`;
+}
+
+// Silent update — counters only, no DOM (used by skipToAlert)
+function handleEventSilent(data) {
+    processedCount = data.sequence;
+    if (data.is_alert) {
+        alertCount++;
+        moneySaved += data.amount;
+        if (data.actual_is_fraud === 0) fpCount++;
+    }
+    alertTimeline.push(data.is_alert ? 1 : 0);
+    if (compareMode && data.compare_predictions) _updateCmpStats(data);
+}
+
+function updateTimeline() {
+    if (!timelineChart) {
+        const ctx = document.getElementById('timeline-chart').getContext('2d');
+        timelineChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{
+                label: 'Cumulative Alerts', data: [],
+                borderColor: '#e74c3c', fill: false, tension: 0.1, pointRadius: 0,
+            }]},
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {legend: {display: false}},
+                scales: {x: {display: false}, y: {beginAtZero: true}}
+            }
+        });
+    }
+    let cumulative = 0;
+    const cumData = alertTimeline.map(v => { cumulative += v; return cumulative; });
+    timelineChart.data.labels = alertTimeline.map((_, i) => i + 1);
+    timelineChart.data.datasets[0].data = cumData;
+    timelineChart.update('none');
+}
+
+// ---- Controls ----
+function pauseSimulation() {
+    paused = !paused;
+    document.getElementById('btn-pause').textContent = paused ? 'Resume' : 'Pause';
+    // Resume: displayTimer keeps running, processQueuedEvents will drain the queue
+}
+
+function skipToAlert() {
+    const nextIdx = eventQueue.findIndex(e => e.is_alert);
+    if (nextIdx === -1) {
+        showToast('No alerts buffered yet — stream is still loading', 'info');
+        return;
+    }
+    // Silently consume all events before the next alert
+    const skipped = eventQueue.splice(0, nextIdx);
+    skipped.forEach(handleEventSilent);
+    // Flush counters to DOM
+    const total = simTotal || 1;
+    document.getElementById('sim-progress').style.width = (processedCount / total * 100).toFixed(0) + '%';
+    document.getElementById('sim-counter').textContent =
+        `Jumped to alert — Transaction ${processedCount} of ${total}`;
+    document.getElementById('m-processed').textContent = processedCount;
+    document.getElementById('m-alerts').textContent = alertCount;
+    document.getElementById('m-saved').textContent = '$' + moneySaved.toLocaleString('en-US', {maximumFractionDigits: 0});
+    document.getElementById('m-fp').textContent = fpCount;
+    updateTimeline();
+    // Render the alert itself
+    if (eventQueue.length > 0) handleEvent(eventQueue.shift());
+    if (nextIdx > 0) showToast(`Skipped ${nextIdx} transactions to next alert`, 'info');
+}
+
+// ---- Cardholder History ----
+let _chSpendChart = null, _chCatChart = null, _chTimeChart = null;
+
+async function showCardHistory(cardId) {
+    const modal   = document.getElementById('ch-modal');
+    const loading = document.getElementById('ch-loading');
+    const content = document.getElementById('ch-content');
+    const errorEl = document.getElementById('ch-error');
+    modal.style.display = 'flex';
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    errorEl.style.display = 'none';
+    // destroy old charts so canvases are clean
+    if (_chSpendChart) { _chSpendChart.destroy(); _chSpendChart = null; }
+    if (_chCatChart)   { _chCatChart.destroy();   _chCatChart = null;   }
+    if (_chTimeChart)  { _chTimeChart.destroy();  _chTimeChart = null;  }
+    try {
+        const resp = await fetch('/api/cardholder/' + encodeURIComponent(cardId) + '/history');
+        const data = await resp.json();
+        loading.style.display = 'none';
+        if (data.error) {
+            errorEl.textContent = data.error;
+            errorEl.style.display = 'block';
+            return;
+        }
+        content.style.display = 'block';
+        _renderCardHistory(data);
+    } catch(e) {
+        loading.style.display = 'none';
+        errorEl.textContent = 'Failed to load card history — ' + e.message;
+        errorEl.style.display = 'block';
+    }
+}
+
+function closeCardHistoryModal() {
+    document.getElementById('ch-modal').style.display = 'none';
+}
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('ch-modal').style.display === 'flex')
+        closeCardHistoryModal();
+});
+
+function _renderCardHistory(data) {
+    document.getElementById('ch-card-id').textContent = data.card_id;
+    const s = data.summary;
+    document.getElementById('ch-total-txns').textContent  = s.total_transactions;
+    document.getElementById('ch-total-spent').textContent = '$' + s.total_spent.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('ch-avg-amount').textContent  = '$' + s.avg_amount.toFixed(2);
+    document.getElementById('ch-fraud-count').textContent = s.fraud_count + ' (' + s.fraud_rate.toFixed(1) + '%)';
+    document.getElementById('ch-first-seen').textContent  = s.first_seen ? s.first_seen.slice(0,10) : 'N/A';
+
+    const ab = document.getElementById('ch-attack-badge');
+    if (data.attack_detected) {
+        ab.style.display = 'inline-block';
+        ab.textContent = data.attack_duration_minutes != null
+            ? '⚠ Attack detected (' + data.attack_duration_minutes + ' min burst)'
+            : '⚠ Attack detected';
+    } else {
+        ab.style.display = 'none';
+    }
+
+    const v = data.velocity_analysis;
+    const spikeH  = v.velocity_spike_factor  > 5 ? '<span class="ch-spike-badge">⚠ ' + v.velocity_spike_factor  + 'x spike</span>' : '';
+    const spendH  = v.spend_spike_factor      > 5 ? '<span class="ch-spike-badge">⚠ ' + v.spend_spike_factor      + 'x spike</span>' : '';
+    document.getElementById('ch-velocity').innerHTML = `
+        <div class="ch-vel-row"><span>Normal velocity (avg):</span><span>${v.normal_daily_velocity} txn/hr</span></div>
+        <div class="ch-vel-row${v.velocity_spike_factor > 5 ? ' ch-danger' : ''}"><span>Attack velocity:</span><span>${v.attack_velocity} txn/hr ${spikeH}</span></div>
+        <div class="ch-vel-row"><span>Normal avg spend:</span><span>$${v.normal_hourly_spend.toFixed(2)}</span></div>
+        <div class="ch-vel-row${v.spend_spike_factor > 5 ? ' ch-danger' : ''}"><span>Attack hourly spend:</span><span>$${v.attack_hourly_spend.toFixed(2)} ${spendH}</span></div>`;
+
+    _renderChSpendingChart(data.transactions);
+    _renderChTxnTable(data.transactions, data.attack_start_index);
+    _renderChCategoryChart(data.category_breakdown);
+    _renderChTimeChart(data.time_distribution);
+}
+
+function _renderChSpendingChart(transactions) {
+    const txns = [...transactions].reverse();
+    const ctx = document.getElementById('ch-spending-chart').getContext('2d');
+    _chSpendChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: txns.map((_,i) => i+1),
+            datasets: [{
+                data: txns.map(t => t.amount),
+                backgroundColor: txns.map(t => t.is_fraud ? 'rgba(231,76,60,0.8)' : 'rgba(46,204,113,0.5)'),
+                borderColor:     txns.map(t => t.is_fraud ? '#e74c3c' : '#2ecc71'),
+                borderWidth: 1,
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: 'Spending Over Time  (red = FRAUD/REVIEW,  green = NORMAL)', font:{size:10} }
+            },
+            scales: {
+                y: { beginAtZero: true, title:{ display:true, text:'Amount ($)', font:{size:10} } },
+                x: { title:{ display:true, text:'Transaction #', font:{size:10} } }
+            }
+        }
+    });
+}
+
+function _renderChTxnTable(transactions, attackStartIndex) {
+    const tbody = document.getElementById('ch-txn-tbody');
+    tbody.innerHTML = '';
+    let markerShown = false;
+    transactions.forEach((txn, i) => {
+        if (!markerShown && attackStartIndex != null && i === attackStartIndex) {
+            const mr = document.createElement('tr');
+            mr.className = 'ch-attack-marker';
+            mr.innerHTML = '<td colspan="7">⚠ ATTACK STARTED — Velocity spike detected</td>';
+            tbody.appendChild(mr);
+            markerShown = true;
+        }
+        const dec  = txn.decision;
+        const icon = dec==='FRAUD'?'🔴':dec==='REVIEW'?'🟡':'🟢';
+        const tr   = document.createElement('tr');
+        if (txn.is_fraud) tr.className = 'ch-row-fraud';
+        tr.style.cursor = 'pointer';
+        tr.title = 'Click for SHAP explanation';
+        tr.innerHTML = `
+            <td>${txn.index}</td>
+            <td style="white-space:nowrap;">${_chFmtTs(txn.timestamp)}</td>
+            <td>$${txn.amount.toFixed(2)}</td>
+            <td style="font-size:0.72rem;">${txn.category}</td>
+            <td style="font-family:var(--mono);">${(txn.probability*100).toFixed(1)}%</td>
+            <td>${icon} ${dec}</td>
+            <td>${txn.velocity_1h}</td>`;
+        if (txn.features && Object.keys(txn.features).length > 0) {
+            const fc = Object.assign({}, txn.features);
+            tr.onclick = () => showExplanationModal(fc, {
+                transaction_id: 'Txn #' + txn.index,
+                amount: txn.amount, category: txn.category,
+                hour: fc.hour || 0, probability: txn.probability, classification: txn.decision,
+            });
+        }
+        tbody.appendChild(tr);
+    });
+}
+
+function _chFmtTs(ts) {
+    if (!ts) return 'N/A';
+    try {
+        const d = new Date(String(ts).slice(0,19).replace(' ','T'));
+        if (isNaN(d)) return String(ts).slice(0,16);
+        return d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + ' ' +
+               d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    } catch { return String(ts).slice(0,16); }
+}
+
+function _renderChCategoryChart(breakdown) {
+    const entries = Object.entries(breakdown).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    const ctx = document.getElementById('ch-category-chart').getContext('2d');
+    _chCatChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: entries.map(([k])=>k),
+            datasets: [{ data: entries.map(([,v])=>v), backgroundColor:'rgba(52,152,219,0.7)', borderRadius:3 }]
+        },
+        options: {
+            indexAxis: 'y', responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{display:false} },
+            scales:{ x:{ beginAtZero:true } }
+        }
+    });
+}
+
+function _renderChTimeChart(dist) {
+    const ctx = document.getElementById('ch-time-chart').getContext('2d');
+    _chTimeChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Morning (6–12)','Afternoon (12–18)','Evening (18–22)','Night (22–6)'],
+            datasets: [{ data:[dist.morning,dist.afternoon,dist.evening,dist.night],
+                backgroundColor:['#f39c12','#3498db','#9b59b6','#e74c3c'] }]
+        },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{ position:'bottom', labels:{ font:{size:9}, padding:6 } } }
+        }
+    });
+}
+
+function resetSimulation() {
+    if (fetchController) { fetchController.abort(); fetchController = null; }
+    if (displayTimer) { clearInterval(displayTimer); displayTimer = null; }
+    paused = false;
+    eventQueue = [];
+    simulationDone = false;
+    simTotal = 0;
+    alertCount = 0; processedCount = 0; moneySaved = 0; fpCount = 0;
+    alertTimeline = [];
+    _resetCmpStats();
+    _renderCmpStats();
+    document.getElementById('live-feed').innerHTML = '';
+    document.getElementById('m-processed').textContent = '0';
+    document.getElementById('m-alerts').textContent = '0';
+    document.getElementById('m-saved').textContent = '$0';
+    document.getElementById('m-fp').textContent = '0';
+    document.getElementById('sim-progress').style.width = '0%';
+    document.getElementById('sim-counter').textContent = 'Ready — select model and dataset, then press Start';
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-pause').disabled = true;
+    document.getElementById('btn-pause').textContent = 'Pause';
+    document.getElementById('btn-skip').disabled = true;
+    document.getElementById('btn-inject').disabled = true;
+    document.getElementById('latest-alert').style.display = 'none';
+    document.getElementById('narration-panel').style.display = 'none';
+    if (timelineChart) { timelineChart.destroy(); timelineChart = null; }
+    // Reset the database
+    fetch('/api/simulation/start', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({delay: 0, max: 1, dataset: 'demo'})
+    }).catch(() => {});
+}
+
+// ---- Inject Attack ----
+let _injectCooldown = false;
+
+function injectAttack() {
+    if (_injectCooldown) return;
+    const btn = document.getElementById('btn-inject');
+    btn.disabled = true;
+    btn.textContent = '⚡ Injecting...';
+    _injectCooldown = true;
+
+    fetch('/api/simulation/inject_attack', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({count: 3})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) {
+            btn.textContent = `⚡ Injected (${d.injected})`;
+            showToast(`⚡ Attack burst injected — ${d.injected} transactions queued for card ${d.card}`, 'fraud');
+        } else {
+            btn.textContent = '⚡ Inject Attack';
+            showToast('Inject failed — is a simulation running?', 'info');
+        }
+    })
+    .catch(() => {
+        btn.textContent = '⚡ Inject Attack';
+    })
+    .finally(() => {
+        // Re-enable after 4s cooldown
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = '⚡ Inject Attack';
+            _injectCooldown = false;
+        }, 4000);
+    });
+}
+
+let _attackToastTimer = null;
+
+function showAttackOverlay(data) {
+    // Flash the screen red
+    const overlay = document.getElementById('attack-overlay');
+    overlay.style.display = 'block';
+    overlay.style.animation = 'none';
+    void overlay.offsetWidth; // force reflow
+    overlay.style.animation = 'overlay-flash 0.6s ease-out forwards';
+    setTimeout(() => { overlay.style.display = 'none'; }, 650);
+
+    // Show big attack toast
+    const toast = document.getElementById('attack-toast');
+    toast.textContent = `⚡ ATTACK INJECTED — $${data.amount.toFixed(2)} flagged ${data.classification} (${(data.probability*100).toFixed(1)}%)`;
+    toast.style.display = 'block';
+    toast.style.animation = 'none';
+    void toast.offsetWidth;
+    toast.style.animation = 'toast-in 0.3s ease-out';
+    if (_attackToastTimer) clearTimeout(_attackToastTimer);
+    _attackToastTimer = setTimeout(() => { toast.style.display = 'none'; }, 4000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h4>Dashboard</h4>
+        <div class="subtitle"><span class="status-dot-live"></span> System operational</div>
+    </div>
+    <a href="/analyse" class="btn btn-fraudlens">Analyse Transactions</a>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4 fade-in">
+    <div class="col-md-2">
+        <div class="stat-card info">
+            <div class="stat-value" id="stat-total">{{ stats.total_processed }}</div>
+            <div class="stat-label">Processed</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card fraud">
+            <div class="stat-value" id="stat-alerts">{{ stats.alerts_raised }}</div>
+            <div class="stat-label">Alerts Raised</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card review">
+            <div class="stat-value" id="stat-pending">{{ stats.pending_review }}</div>
+            <div class="stat-label">Pending Review</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-fp" style="color:var(--text-muted);">{{ stats.false_alarms }}</div>
+            <div class="stat-label">False Alarms</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card safe">
+            <div class="stat-value" id="stat-saved">${{ "{:,.0f}".format(stats.money_saved) }}</div>
+            <div class="stat-label">Money Protected</div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="stat-card fraud">
+            <div class="stat-value" id="stat-risk">${{ "{:,.0f}".format(stats.money_at_risk) }}</div>
+            <div class="stat-label">At Risk</div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0" style="font-weight:700;font-size:0.85rem;">Alert Breakdown</h6>
+            </div>
+            <div class="chart-container" style="height:220px;">
+                <canvas id="alertChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="mb-0" style="font-weight:700;font-size:0.85rem;">Fraud by Hour</h6>
+            </div>
+            <div class="chart-container" style="height:220px;">
+                <canvas id="hourChart"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card p-3">
+            <h6 class="mb-3" style="font-weight:700;font-size:0.85rem;">Model Health</h6>
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <span class="status-dot-live"></span>
+                <span style="font-size:0.85rem;font-weight:600;">{{ model_info.active_model }}</span>
+            </div>
+            <table class="table table-sm" style="font-size:0.8rem;">
+                <tr><td class="text-muted">Baseline F1</td><td class="text-end"><strong style="font-family:var(--mono);">0.8646</strong></td></tr>
+                <tr><td class="text-muted">Precision</td><td class="text-end"><strong style="font-family:var(--mono);">0.9297</strong></td></tr>
+                <tr><td class="text-muted">Recall</td><td class="text-end"><strong style="font-family:var(--mono);">0.8079</strong></td></tr>
+                <tr><td class="text-muted">Throughput</td><td class="text-end"><strong style="font-family:var(--mono);">826K/s</strong></td></tr>
+                <tr><td class="text-muted">Drift Status</td><td class="text-end"><span class="badge" style="background:#2ecc71;">GREEN</span></td></tr>
+            </table>
+            <div class="mt-2">
+                <small class="text-muted">Models available: {{ model_info.available_models|length }}</small><br>
+                {% for m in model_info.available_models %}
+                <span class="badge bg-secondary me-1" style="font-size:0.65rem;">{{ m }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Alerts -->
+<div class="card p-3 fade-in">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0" style="font-weight:700;font-size:0.85rem;">Recent Alerts</h6>
+        <a href="/alerts" class="btn btn-sm btn-outline-danger">View All</a>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Time</th><th>Transaction</th><th>Amount</th><th>Category</th>
+                    <th>Probability</th><th>Risk</th><th>Decision</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="alerts-body">
+                <tr><td colspan="8" class="text-center text-muted py-4">
+                    No alerts yet. <a href="/analyse">Analyse transactions</a> or <a href="/monitor">run live demo</a> to see alerts.
+                </td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-3 mt-3">
+    <div class="col-md-4">
+        <a href="/analyse" class="card p-3 text-decoration-none" style="border-left:4px solid var(--accent);">
+            <div class="d-flex align-items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <div>
+                    <strong style="font-size:0.88rem;">Analyse Transactions</strong>
+                    <div class="text-muted" style="font-size:0.75rem;">Upload CSV for batch analysis</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="/monitor" class="card p-3 text-decoration-none" style="border-left:4px solid var(--safe);">
+            <div class="d-flex align-items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--safe)" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                <div>
+                    <strong style="font-size:0.88rem;">Live Demo</strong>
+                    <div class="text-muted" style="font-size:0.75rem;">Watch FraudLens in real-time</div>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-4">
+        <a href="/predict" class="card p-3 text-decoration-none" style="border-left:4px solid var(--warning);">
+            <div class="d-flex align-items-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <div>
+                    <strong style="font-size:0.88rem;">Predict Single</strong>
+                    <div class="text-muted" style="font-size:0.75rem;">Analyse one transaction</div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function refreshStats() {
+    fetch('/api/stats').then(r => r.json()).then(d => {
+        document.getElementById('stat-total').textContent = d.total_processed.toLocaleString();
+        document.getElementById('stat-alerts').textContent = d.alerts_raised;
+        document.getElementById('stat-pending').textContent = d.pending_review;
+        document.getElementById('stat-fp').textContent = d.false_alarms;
+        document.getElementById('stat-saved').textContent = '$' + d.money_saved.toLocaleString('en-US', {maximumFractionDigits:0});
+        document.getElementById('stat-risk').textContent = '$' + d.money_at_risk.toLocaleString('en-US', {maximumFractionDigits:0});
+    }).catch(()=>{});
+
+    fetch('/api/alerts?limit=10').then(r => r.json()).then(d => {
+        const tbody = document.getElementById('alerts-body');
+        if (!d.alerts || d.alerts.length === 0) return;
+        tbody.innerHTML = '';
+        d.alerts.forEach(a => {
+            const prob = ((a.probability||0)*100).toFixed(1);
+            const probColor = a.probability >= 0.8 ? '#e74c3c' : a.probability >= 0.5 ? '#f39c12' : '#2ecc71';
+            const row = document.createElement('tr');
+            row.className = 'alert-row-' + (a.risk_level||'');
+            row.innerHTML = `
+                <td style="font-size:0.78rem;">${a.created_at || ''}</td>
+                <td><strong>${a.transaction_id || ''}</strong></td>
+                <td style="font-family:var(--mono);font-weight:600;">$${(a.amount||0).toFixed(2)}</td>
+                <td>${a.category || ''}</td>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="prob-meter flex-grow-1" style="height:6px;"><div class="fill" style="width:${prob}%;background:${probColor};"></div></div>
+                        <span style="font-family:var(--mono);font-size:0.75rem;font-weight:600;color:${probColor};">${prob}%</span>
+                    </div>
+                </td>
+                <td><span class="badge badge-${a.risk_level}">${a.risk_level}</span></td>
+                <td><span class="badge badge-${a.classification}">${a.classification}</span></td>
+                <td><span class="badge bg-${a.status === 'confirmed' ? 'success' : a.status === 'pending' ? 'secondary' : 'warning'}" style="font-size:0.65rem;">${a.status}</span></td>`;
+            tbody.appendChild(row);
+        });
+    }).catch(()=>{});
+}
+
+setInterval(() => { refreshStats(); refreshHourChart(); }, 30000);
+
+// Charts
+const alertCtx = document.getElementById('alertChart');
+new Chart(alertCtx, {
+    type: 'doughnut',
+    data: {
+        labels: ['Confirmed', 'False Alarms', 'Pending'],
+        datasets: [{
+            data: [{{ stats.confirmed_frauds }}, {{ stats.false_alarms }}, {{ stats.pending_review }}],
+            backgroundColor: ['#e74c3c', '#f39c12', '#0984e3'],
+            borderWidth: 0,
+            spacing: 2,
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false, cutout: '70%',
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 10, padding: 12, font: { size: 11 } } }
+        }
+    }
+});
+
+const hourChart = new Chart(document.getElementById('hourChart'), {
+    type: 'bar',
+    data: {
+        labels: Array.from({length:24}, (_,i) => i),
+        datasets: [{
+            label: 'Alerts by Hour',
+            data: Array(24).fill(0),
+            backgroundColor: 'rgba(231,76,60,0.7)',
+            borderRadius: 4,
+        }]
+    },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+            y: { beginAtZero: true, grid: { color: '#f0f0f0' } }
+        }
+    }
+});
+
+function refreshHourChart() {
+    fetch('/api/recent?limit=500').then(r => r.json()).then(d => {
+        if (!d.transactions) return;
+        const hourData = Array(24).fill(0);
+        d.transactions
+            .filter(t => t.classification === 'FRAUD' || t.classification === 'REVIEW')
+            .forEach(t => { if (t.hour >= 0 && t.hour < 24) hourData[t.hour]++; });
+        hourChart.data.datasets[0].data = hourData;
+        hourChart.update();
+    }).catch(()=>{});
+}
+refreshHourChart();
+</script>
+{% endblock %}

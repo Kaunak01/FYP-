@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Batch Upload — Fraud Detection System{% endblock %}
+{% block content %}
+<h4 class="mb-4">Batch Prediction</h4>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h6>Upload Transactions (JSON)</h6>
+            <textarea id="batch-input" class="form-control mb-3" rows="12" placeholder='{"transactions": [
+  {"amount": 500, "merchant_category": "electronics", "timestamp": "2024-03-15 23:45:00", "cardholder_age": 34, "cardholder_gender": "M", "velocity_1h": 3, "velocity_24h": 8, "amount_velocity_1h": 1500},
+  {"amount": 15, "merchant_category": "grocery", "timestamp": "2024-03-16 12:00:00", "cardholder_age": 45}
+]}'></textarea>
+            <button class="btn btn-danger w-100" onclick="runBatch()">Run Batch Predictions</button>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div id="batch-results" style="display:none;">
+            <div class="row g-3 mb-3">
+                <div class="col-4"><div class="stat-card fraud"><div class="stat-value" id="b-fraud">0</div><div class="stat-label">Fraud</div></div></div>
+                <div class="col-4"><div class="stat-card review"><div class="stat-value" id="b-review">0</div><div class="stat-label">Review</div></div></div>
+                <div class="col-4"><div class="stat-card normal"><div class="stat-value" id="b-normal">0</div><div class="stat-label">Normal</div></div></div>
+            </div>
+            <div class="card p-3">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead><tr><th>ID</th><th>Amount</th><th>Prob</th><th>Risk</th><th>Decision</th></tr></thead>
+                        <tbody id="batch-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function runBatch() {
+    const input = document.getElementById('batch-input').value;
+    let data;
+    try { data = JSON.parse(input); } catch(e) { alert('Invalid JSON: ' + e.message); return; }
+
+    const btn = document.querySelector('#batch-input ~ button, .btn-danger');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+
+    fetch('/api/predict/batch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        document.getElementById('batch-results').style.display = 'block';
+        document.getElementById('b-fraud').textContent = result.fraud_count;
+        document.getElementById('b-review').textContent = result.review_count;
+        document.getElementById('b-normal').textContent = result.normal_count;
+
+        const tbody = document.getElementById('batch-table');
+        tbody.innerHTML = '';
+        result.results.forEach(r => {
+            const row = document.createElement('tr');
+            row.className = 'alert-row-' + (r.risk_level || '');
+            row.innerHTML = '<td>' + r.transaction_id + '</td><td>$' + (r.amount||0).toFixed(2) + '</td><td>' +
+                ((r.probability||0)*100).toFixed(1) + '%</td><td><span class="badge badge-' + (r.risk_level||'LOW') + '">' +
+                (r.risk_level||'') + '</span></td><td><span class="badge badge-' + (r.classification||'NORMAL') + '">' +
+                (r.classification||'') + '</span></td>';
+            tbody.appendChild(row);
+        });
+    })
+    .catch(err => alert('Request failed: ' + err.message))
+    .finally(() => {
+        btn.disabled = false;
+        btn.textContent = 'Run Batch Predictions';
+    });
+}
+</script>
+{% endblock %}

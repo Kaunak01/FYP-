@@ -1,0 +1,801 @@
+{% extends "base.html" %}
+{% block title %}Analyse Transactions{% endblock %}
+{% block content %}
+<div class="page-header">
+    <h4>Analyse Transactions</h4>
+    <div class="subtitle">Upload any transaction CSV. FraudLens analyses every row — detects fraud, explains decisions, reports findings.</div>
+</div>
+
+<!-- STATE 1: UPLOAD -->
+<div id="state-upload">
+
+    <!-- Model Selector -->
+    <div class="row justify-content-center mb-3">
+        <div class="col-md-8">
+            <div class="card p-3">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <label class="text-muted mb-0" style="white-space:nowrap;font-size:0.85rem;">Select Model</label>
+                    <select id="model-select" class="form-select form-select-sm" style="max-width:320px;" onchange="switchModel(this.value)">
+                        <option value="xgboost_baseline">XGBoost Baseline (F1: 0.52)</option>
+                        <option value="xgboost_smote">XGBoost + SMOTE (F1: 0.87)</option>
+                        <option value="ae_xgboost">Autoencoder + XGBoost (F1: 0.87)</option>
+                        <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.87) ★ Best</option>
+                    </select>
+                    <span id="model-switch-status" class="text-muted" style="font-size:0.8rem;"></span>
+                </div>
+                <div id="model-stale-banner" class="alert alert-warning mt-2 mb-0 py-1 px-2" style="display:none;font-size:0.8rem;">
+                    Results shown are from a previous model. Upload a file and click Analyse to run with the selected model.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="upload-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+                <svg class="upload-icon" viewBox="0 0 40 40" fill="none">
+                    <path d="M20 2 L36 10 L36 26 C36 32 28 38 20 40 C12 38 4 32 4 26 L4 10 Z" fill="none" stroke="#636e72" stroke-width="1"/>
+                    <text x="20" y="27" text-anchor="middle" fill="#636e72" font-family="Inter,sans-serif" font-weight="800" font-size="14">S</text>
+                </svg>
+                <h5>Drop your transaction file here</h5>
+                <p>or click to browse</p>
+                <p class="small text-muted mt-2">CSV files with transaction data</p>
+                <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleFile(this.files[0])">
+            </div>
+            <div class="text-center mt-3">
+                <a href="/api/sample/mixed" download class="btn btn-sm btn-outline-secondary me-2">Sample: Mixed (50 txns)</a>
+                <a href="/api/sample/fraud" download class="btn btn-sm btn-outline-secondary">Sample: Fraud-Heavy (30 txns)</a>
+            </div>
+        </div>
+    </div>
+    <div class="row g-3 mt-4 justify-content-center">
+        <div class="col-md-3"><div class="card p-3 text-center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#e74c3c" stroke-width="1.8" class="mx-auto mb-2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg><h6 class="mb-1" style="font-size:0.85rem;">Detect Fraud</h6><small class="text-muted">ML + Rules hybrid detection</small></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0984e3" stroke-width="1.8" class="mx-auto mb-2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg><h6 class="mb-1" style="font-size:0.85rem;">Explain Why</h6><small class="text-muted">SHAP explanations per transaction</small></div></div>
+        <div class="col-md-3"><div class="card p-3 text-center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" stroke-width="1.8" class="mx-auto mb-2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><h6 class="mb-1" style="font-size:0.85rem;">Full Report</h6><small class="text-muted">Charts, stats, downloadable results</small></div></div>
+    </div>
+</div>
+
+<!-- STATE 2: PROCESSING -->
+<div id="state-processing" style="display:none;">
+    <div class="card p-5 text-center">
+        <div class="spinner-border text-primary mb-3" style="width:3rem;height:3rem;"></div>
+        <h5 id="processing-text">Analysing transactions...</h5>
+        <div class="progress mt-3" style="height:8px;max-width:500px;margin:0 auto;border-radius:4px;">
+            <div class="progress-bar" id="processing-bar" style="width:0%;background:linear-gradient(90deg,var(--accent),#2d98da);"></div>
+        </div>
+        <small class="text-muted mt-2" id="processing-count">Preparing...</small>
+    </div>
+</div>
+
+<!-- STATE 3: RESULTS -->
+<div id="state-results" style="display:none;">
+
+    <!-- Summary banner -->
+    <div class="card p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <strong id="results-title" style="font-size:1.05rem;"></strong>
+                <div class="text-muted" style="font-size:0.8rem;" id="results-subtitle"></div>
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary me-1" onclick="downloadResults()">Download CSV</button>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="openReportModal()">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>PDF Report
+                </button>
+                <button class="btn btn-sm btn-fraudlens" onclick="resetAnalysis()">New Analysis</button>
+            </div>
+        </div>
+        <div class="row g-2">
+            <div class="col"><div class="stat-card fraud py-2 px-3"><div class="stat-value fs-5" id="r-fraud">0</div><div class="stat-label">Fraud</div></div></div>
+            <div class="col"><div class="stat-card review py-2 px-3"><div class="stat-value fs-5" id="r-review">0</div><div class="stat-label">Review</div></div></div>
+            <div class="col"><div class="stat-card py-2 px-3" style="border-left-color:var(--monitor);"><div class="stat-value fs-5" id="r-monitor">0</div><div class="stat-label">Monitor</div></div></div>
+            <div class="col"><div class="stat-card safe py-2 px-3"><div class="stat-value fs-5" id="r-normal">0</div><div class="stat-label">Normal</div></div></div>
+            <div class="col"><div class="stat-card fraud py-2 px-3"><div class="stat-value fs-5" id="r-risk-amt">$0</div><div class="stat-label">At Risk</div></div></div>
+        </div>
+        <div class="risk-bar mt-2" id="risk-bar"></div>
+    </div>
+
+    <!-- Analysis Tabs -->
+    <ul class="nav nav-tabs mb-3" id="analysisTabs">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab-overview">Overview</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-transactions">Transactions</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab-patterns">Pattern Analysis</a></li>
+        <li class="nav-item" id="perf-tab-li" style="display:none;"><a class="nav-link" data-bs-toggle="tab" href="#tab-performance">Model Performance</a></li>
+    </ul>
+
+    <div class="tab-content">
+
+        <!-- TAB 1: OVERVIEW -->
+        <div class="tab-pane fade show active" id="tab-overview">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Probability Distribution</h6>
+                        <div class="chart-container" style="height:220px;"><canvas id="chart-prob-dist"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Risk Level Breakdown</h6>
+                        <div class="chart-container" style="height:220px;"><canvas id="chart-risk-donut"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Amount Analysis</h6>
+                        <table class="table table-sm" style="font-size:0.82rem;" id="amount-stats-table"></table>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Fraud by Hour of Day</h6>
+                        <div class="chart-container" style="height:220px;"><canvas id="chart-hour"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Fraud by Category</h6>
+                        <div class="chart-container" style="height:220px;"><canvas id="chart-category"></canvas></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Top Flagged -->
+            <div class="card p-3 mt-3">
+                <h6 style="font-weight:700;font-size:0.85rem;">Top 10 Highest Risk Transactions</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead><tr><th>ID</th><th>Amount</th><th>Category</th><th>Hour</th><th>Probability</th><th>Decision</th><th>Rules</th></tr></thead>
+                        <tbody id="top-flagged-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: TRANSACTIONS -->
+        <div class="tab-pane fade" id="tab-transactions">
+            <div class="card p-3">
+                <div class="d-flex gap-2 mb-3 flex-wrap">
+                    <button class="btn btn-sm btn-outline-dark active" onclick="filterResults('all',this)">All <span id="f-all"></span></button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="filterResults('FRAUD',this)">Fraud <span id="f-fraud"></span></button>
+                    <button class="btn btn-sm btn-outline-warning" onclick="filterResults('REVIEW',this)">Review <span id="f-review"></span></button>
+                    <button class="btn btn-sm btn-outline-success" onclick="filterResults('NORMAL',this)">Normal <span id="f-normal"></span></button>
+                    <input type="text" id="search-input" class="form-control form-control-sm ms-auto" style="width:200px;" placeholder="Search ID or category..." oninput="searchResults(this.value)">
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover" id="results-table">
+                        <thead><tr><th>#</th><th>Amount</th><th>Category</th><th>Hour</th><th>Probability</th><th>Risk</th><th>Decision</th><th>Top Reason</th><th></th></tr></thead>
+                        <tbody id="results-body"></tbody>
+                    </table>
+                </div>
+                <div id="pagination" class="d-flex justify-content-between align-items-center mt-2"></div>
+            </div>
+            <!-- Detail panel -->
+            <div class="card p-3 mt-3" id="detail-panel" style="display:none;">
+                <div class="d-flex justify-content-between"><h6 id="detail-title">Transaction Details</h6><button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('detail-panel').style.display='none'">Close</button></div>
+                <div class="row mt-2">
+                    <div class="col-md-4"><h6 class="small text-muted">FEATURES</h6><table class="table table-sm" id="detail-features"></table></div>
+                    <div class="col-md-4"><h6 class="small text-muted">BEHAVIOURAL FEATURES</h6><canvas id="detail-shap" height="250"></canvas></div>
+                    <div class="col-md-4"><h6 class="small text-muted">RECOMMENDATION</h6><div id="detail-recommendation"></div><h6 class="small text-muted mt-3">RULES</h6><div id="detail-rules"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: PATTERN ANALYSIS -->
+        <div class="tab-pane fade" id="tab-patterns">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Nighttime vs Daytime</h6>
+                        <div id="night-day-stats"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Velocity Analysis</h6>
+                        <div id="velocity-stats"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="card p-3 mt-3">
+                <h6 style="font-weight:700;font-size:0.85rem;">Key Findings</h6>
+                <div id="key-findings"></div>
+            </div>
+        </div>
+
+        <!-- TAB 4: PERFORMANCE (if labels available) -->
+        <div class="tab-pane fade" id="tab-performance">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Metrics</h6>
+                        <table class="table table-sm" id="perf-metrics-table"></table>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Confusion Matrix</h6>
+                        <div class="chart-container" style="height:220px;"><canvas id="chart-confusion"></canvas></div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">vs Baseline</h6>
+                        <div id="baseline-comparison"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">Missed Frauds (False Negatives)</h6>
+                        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>ID</th><th>Amount</th><th>Hour</th><th>Prob</th><th>Why Missed</th></tr></thead><tbody id="missed-body"></tbody></table></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card p-3">
+                        <h6 style="font-weight:700;font-size:0.85rem;">False Positives</h6>
+                        <div class="table-responsive"><table class="table table-sm"><thead><tr><th>ID</th><th>Amount</th><th>Hour</th><th>Prob</th><th>Why Flagged</th></tr></thead><tbody id="fp-body"></tbody></table></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Report Config Modal -->
+<div id="report-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9900;overflow-y:auto;">
+  <div style="max-width:540px;margin:60px auto;background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="background:#1a1a2e;color:#fff;padding:20px 24px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <div style="font-size:1.1rem;font-weight:700;letter-spacing:0.5px;">Generate PDF Report</div>
+        <div style="font-size:0.75rem;opacity:0.7;margin-top:2px;">Regulatory-grade fraud analysis document</div>
+      </div>
+      <button onclick="document.getElementById('report-modal').style.display='none'" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+    </div>
+    <div style="padding:24px;">
+      <div class="mb-3">
+        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Institution Name</label>
+        <input type="text" id="rpt-institution" class="form-control form-control-sm" value="Financial Institution" placeholder="e.g. First National Bank">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Prepared By</label>
+        <input type="text" id="rpt-preparer" class="form-control form-control-sm" value="Fraud Analytics Team" placeholder="Analyst name / team">
+      </div>
+      <div class="mb-3">
+        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Classification Level</label>
+        <select id="rpt-classification" class="form-select form-select-sm">
+          <option value="CONFIDENTIAL" selected>CONFIDENTIAL</option>
+          <option value="INTERNAL">INTERNAL</option>
+          <option value="RESTRICTED">RESTRICTED</option>
+          <option value="PUBLIC">PUBLIC</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Sections to Include</label>
+        <div class="d-flex flex-column gap-1 mt-1">
+          <label class="d-flex align-items-center gap-2" style="font-size:0.82rem;cursor:pointer;"><input type="checkbox" id="rpt-inc-recommend" checked> Recommendations &amp; Action Plan</label>
+          <label class="d-flex align-items-center gap-2" style="font-size:0.82rem;cursor:pointer;"><input type="checkbox" id="rpt-inc-appendix" checked> Technical Appendix &amp; Glossary</label>
+        </div>
+      </div>
+      <hr>
+      <div id="rpt-status" style="font-size:0.82rem;min-height:20px;color:#636e72;margin-bottom:12px;"></div>
+      <div class="d-flex gap-2">
+        <button id="rpt-generate-btn" class="btn btn-sm btn-fraudlens flex-grow-1" onclick="generateReport()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Generate Report
+        </button>
+        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('report-modal').style.display='none'">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allResults = [];
+let analysisData = null;
+let currentFilter = 'all';
+let currentPage = 0;
+const PAGE_SIZE = 50;
+let searchQuery = '';
+
+// Drag and drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragover'); handleFile(e.dataTransfer.files[0]); });
+
+function handleFile(file) {
+    if (!file || !file.name.endsWith('.csv')) { alert('Please upload a CSV file'); return; }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const rows = e.target.result.trim().split('\n');
+        const headers = rows[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        const data = [];
+        for (let i = 1; i < rows.length; i++) {
+            const vals = rows[i].split(',').map(v => v.trim().replace(/"/g, ''));
+            const row = {};
+            headers.forEach((h, j) => { row[h] = vals[j]; });
+            data.push(row);
+        }
+        processDataset(data, file.name, rows.length - 1);
+    };
+    reader.readAsText(file);
+}
+
+function processDataset(data, filename, totalRows) {
+    document.getElementById('state-upload').style.display = 'none';
+    document.getElementById('state-processing').style.display = 'block';
+    document.getElementById('processing-text').textContent = 'Analysing ' + totalRows + ' transactions from ' + filename;
+
+    const mapping = {
+        'amt':'amount','amount':'amount','trans_amount':'amount',
+        'category':'merchant_category','merchant_category':'merchant_category','category_encoded':'category_encoded',
+        'trans_date_trans_time':'timestamp','timestamp':'timestamp','date':'timestamp',
+        'age':'cardholder_age','cardholder_age':'cardholder_age',
+        'gender':'cardholder_gender','gender_encoded':'gender_encoded',
+        'city_pop':'city_population','city_population':'city_population',
+        'velocity_1h':'velocity_1h','velocity_24h':'velocity_24h','amount_velocity_1h':'amount_velocity_1h',
+        'is_fraud':'is_fraud','is_night':'is_night','is_weekend':'is_weekend',
+        'hour':'hour','month':'month','distance_cardholder_merchant':'distance_cardholder_merchant',
+        'day_of_week_encoded':'day_of_week_encoded','unix_time':'unix_time',
+    };
+
+    const transactions = data.map((row, i) => {
+        const txn = { transaction_id: 'ROW-' + (i+1) };
+        for (const [csvCol, apiCol] of Object.entries(mapping)) {
+            if (row[csvCol] !== undefined && row[csvCol] !== '') {
+                txn[apiCol] = isNaN(row[csvCol]) ? row[csvCol] : parseFloat(row[csvCol]);
+            }
+        }
+        if (row['is_fraud'] !== undefined && row['is_fraud'] !== '') {
+            txn._actual = parseInt(row['is_fraud']);
+        }
+        return txn;
+    });
+
+    const hasLabels = transactions.some(t => t._actual !== undefined);
+
+    document.getElementById('processing-count').textContent = 'Sending to FraudLens...';
+    document.getElementById('processing-bar').style.width = '30%';
+
+    fetch('/api/analyse', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ transactions: transactions, has_labels: hasLabels })
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('processing-bar').style.width = '100%';
+        analysisData = data;
+        allResults = data.results;
+        showResults(data, filename, totalRows);
+    })
+    .catch(err => alert('Error: ' + err.message));
+}
+
+function showResults(data, filename, totalRows) {
+    document.getElementById('state-processing').style.display = 'none';
+    document.getElementById('state-results').style.display = 'block';
+
+    const c = data.counts;
+    const sel = document.getElementById('model-select');
+    _lastUsedModel = sel ? sel.value : 'ae_bds_xgboost';
+    document.getElementById('model-stale-banner').style.display = 'none';
+    const modelLabel = sel ? sel.options[sel.selectedIndex].text : 'AE + BDS + XGBoost';
+    document.getElementById('results-title').textContent = 'Analysis Complete';
+    document.getElementById('results-subtitle').textContent = totalRows + ' transactions from ' + filename + ' — Model: ' + modelLabel;
+    document.getElementById('r-fraud').textContent = c.FRAUD;
+    document.getElementById('r-review').textContent = c.REVIEW;
+    document.getElementById('r-monitor').textContent = c.MONITOR;
+    document.getElementById('r-normal').textContent = c.NORMAL;
+    document.getElementById('r-risk-amt').textContent = '$' + data.amount_at_risk.toLocaleString('en-US', {maximumFractionDigits:0});
+
+    // Risk bar
+    const total = data.total;
+    const bar = document.getElementById('risk-bar');
+    bar.innerHTML = '';
+    if (c.FRAUD) bar.innerHTML += '<div style="width:'+c.FRAUD/total*100+'%;background:#e74c3c;">'+c.FRAUD+' Fraud</div>';
+    if (c.REVIEW) bar.innerHTML += '<div style="width:'+c.REVIEW/total*100+'%;background:#f39c12;">'+c.REVIEW+'</div>';
+    if (c.MONITOR) bar.innerHTML += '<div style="width:'+c.MONITOR/total*100+'%;background:#f1c40f;color:#333;">'+c.MONITOR+'</div>';
+    if (c.NORMAL) bar.innerHTML += '<div style="width:'+c.NORMAL/total*100+'%;background:#2ecc71;">'+c.NORMAL+' Normal</div>';
+
+    // Filter counts
+    document.getElementById('f-all').textContent = '('+total+')';
+    document.getElementById('f-fraud').textContent = '('+c.FRAUD+')';
+    document.getElementById('f-review').textContent = '('+c.REVIEW+')';
+    document.getElementById('f-normal').textContent = '('+c.NORMAL+')';
+
+    // Overview charts
+    buildOverviewCharts(data);
+    buildPatternAnalysis(data);
+    renderTable();
+
+    // Performance tab
+    if (data.performance) {
+        document.getElementById('perf-tab-li').style.display = 'block';
+        buildPerformanceTab(data.performance);
+    }
+}
+
+function buildOverviewCharts(data) {
+    // Probability distribution
+    new Chart(document.getElementById('chart-prob-dist'), {
+        type: 'bar',
+        data: {
+            labels: ['0-10%','10-20%','20-30%','30-40%','40-50%','50-60%','60-70%','70-80%','80-90%','90-100%'],
+            datasets: [{
+                data: data.prob_distribution,
+                backgroundColor: data.prob_distribution.map((_, i) => i < 5 ? '#2ecc71' : i < 8 ? '#f39c12' : '#e74c3c'),
+                borderRadius: 4,
+            }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: {legend:{display:false}}, scales: {x:{grid:{display:false},ticks:{font:{size:8}}}, y:{beginAtZero:true,grid:{color:'#f0f0f0'}}} }
+    });
+
+    // Risk donut
+    const c = data.counts;
+    new Chart(document.getElementById('chart-risk-donut'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Fraud','Review','Monitor','Normal'],
+            datasets: [{ data: [c.FRAUD, c.REVIEW, c.MONITOR, c.NORMAL], backgroundColor: ['#e74c3c','#f39c12','#f1c40f','#2ecc71'], borderWidth: 0, spacing: 2 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, cutout: '65%', plugins: {legend:{position:'bottom',labels:{boxWidth:10,padding:8,font:{size:10}}}} }
+    });
+
+    // Hour chart
+    const hourLabels = Object.keys(data.hour_counts).sort((a,b)=>a-b);
+    new Chart(document.getElementById('chart-hour'), {
+        type: 'bar',
+        data: {
+            labels: hourLabels.map(h => h+':00'),
+            datasets: [
+                { label: 'Total', data: hourLabels.map(h => data.hour_counts[h]), backgroundColor: 'rgba(9,132,227,0.2)', borderRadius: 3 },
+                { label: 'Flagged', data: hourLabels.map(h => data.hour_fraud[h]||0), backgroundColor: '#e74c3c', borderRadius: 3 }
+            ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: {legend:{labels:{boxWidth:8,font:{size:10}}}}, scales: {x:{grid:{display:false},ticks:{font:{size:7}}}, y:{beginAtZero:true,grid:{color:'#f0f0f0'}}} }
+    });
+
+    // Category chart
+    const cats = Object.entries(data.category_fraud).sort((a,b) => b[1]-a[1]);
+    new Chart(document.getElementById('chart-category'), {
+        type: 'bar',
+        data: {
+            labels: cats.map(c => c[0]),
+            datasets: [{ label: 'Flagged', data: cats.map(c => c[1]), backgroundColor: '#e74c3c', borderRadius: 4 }]
+        },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: {legend:{display:false}}, scales: {x:{beginAtZero:true,grid:{color:'#f0f0f0'}}, y:{ticks:{font:{size:9}}}} }
+    });
+
+    // Amount stats
+    const as = data.amount_stats;
+    document.getElementById('amount-stats-table').innerHTML =
+        '<tr><td class="text-muted">Avg flagged amount</td><td class="text-end"><strong style="font-family:var(--mono);color:var(--danger);">$'+as.flagged_avg.toFixed(2)+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Max flagged amount</td><td class="text-end"><strong style="font-family:var(--mono);">$'+as.flagged_max.toFixed(2)+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Avg normal amount</td><td class="text-end"><strong style="font-family:var(--mono);color:var(--safe);">$'+as.normal_avg.toFixed(2)+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Total at risk</td><td class="text-end"><strong style="font-family:var(--mono);color:var(--danger);">$'+data.amount_at_risk.toLocaleString()+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Avg probability</td><td class="text-end"><strong style="font-family:var(--mono);">'+(data.avg_probability*100).toFixed(2)+'%</strong></td></tr>' +
+        '<tr><td class="text-muted">Max probability</td><td class="text-end"><strong style="font-family:var(--mono);">'+(data.max_probability*100).toFixed(2)+'%</strong></td></tr>';
+
+    // Top flagged
+    const tfb = document.getElementById('top-flagged-body');
+    tfb.innerHTML = '';
+    data.top_flagged.forEach(r => {
+        const color = r.probability >= 0.8 ? '#e74c3c' : r.probability >= 0.5 ? '#f39c12' : '#2ecc71';
+        tfb.innerHTML += '<tr class="alert-row-'+r.classification+'"><td>'+r.transaction_id+'</td><td style="font-family:var(--mono);font-weight:600;">$'+r.amount.toFixed(2)+'</td><td>'+r.category+'</td><td>'+r.hour+':00</td><td><span style="font-family:var(--mono);color:'+color+';font-weight:700;">'+(r.probability*100).toFixed(1)+'%</span></td><td><span class="badge badge-'+r.classification+'">'+r.classification+'</span></td><td>'+(r.rule_triggers.length?r.rule_triggers.join(', '):'-')+'</td></tr>';
+    });
+}
+
+function buildPatternAnalysis(data) {
+    // Night vs Day
+    const nightFraud = allResults.filter(r => r.is_night === 1 && r.classification === 'FRAUD').length;
+    const dayFraud = allResults.filter(r => r.is_night === 0 && r.classification === 'FRAUD').length;
+    const nightTotal = allResults.filter(r => r.is_night === 1).length;
+    const dayTotal = allResults.filter(r => r.is_night === 0).length;
+
+    document.getElementById('night-day-stats').innerHTML =
+        '<table class="table table-sm" style="font-size:0.82rem;">' +
+        '<tr><th></th><th>Daytime</th><th>Nighttime</th></tr>' +
+        '<tr><td class="text-muted">Total transactions</td><td>'+dayTotal+'</td><td>'+nightTotal+'</td></tr>' +
+        '<tr><td class="text-muted">Flagged as fraud</td><td>'+dayFraud+'</td><td>'+nightFraud+'</td></tr>' +
+        '<tr><td class="text-muted">Flag rate</td><td>'+(dayTotal?((dayFraud/dayTotal)*100).toFixed(1):'0')+'%</td><td>'+(nightTotal?((nightFraud/nightTotal)*100).toFixed(1):'0')+'%</td></tr>' +
+        '</table>' +
+        '<small class="text-muted">Nighttime = 10PM-6AM. The model flags nighttime transactions at a higher rate.</small>';
+
+    // Velocity
+    const highVel = allResults.filter(r => r.velocity_1h >= 3);
+    const highVelFraud = highVel.filter(r => r.classification === 'FRAUD').length;
+    document.getElementById('velocity-stats').innerHTML =
+        '<table class="table table-sm" style="font-size:0.82rem;">' +
+        '<tr><td class="text-muted">High velocity transactions (3+ per hour)</td><td><strong>'+highVel.length+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Of those, flagged as fraud</td><td><strong>'+highVelFraud+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Avg amount velocity (flagged)</td><td><strong>$'+(allResults.filter(r=>r.classification==='FRAUD').reduce((s,r)=>s+r.amount_velocity_1h,0)/Math.max(data.counts.FRAUD,1)).toFixed(2)+'</strong>/hr</td></tr>' +
+        '</table>';
+
+    // Key findings
+    const findings = [];
+    if (data.counts.FRAUD > 0) findings.push('Detected <strong>'+data.counts.FRAUD+' fraudulent transactions</strong> totaling <strong>$'+data.amount_at_risk.toLocaleString()+'</strong> at risk.');
+    if (nightFraud > dayFraud) findings.push('Nighttime transactions account for <strong>'+((nightFraud/(nightFraud+dayFraud))*100).toFixed(0)+'%</strong> of detected fraud.');
+    if (data.counts.REVIEW > 0) findings.push('<strong>'+data.counts.REVIEW+' transactions</strong> flagged for human review by the rule engine.');
+    const topCat = Object.entries(data.category_fraud).sort((a,b)=>b[1]-a[1])[0];
+    if (topCat && topCat[1] > 0) findings.push('Most fraud-prone category: <strong>'+topCat[0]+'</strong> ('+topCat[1]+' flagged).');
+    if (findings.length === 0) findings.push('No significant fraud patterns detected in this dataset.');
+
+    document.getElementById('key-findings').innerHTML = '<ul class="mb-0">' + findings.map(f => '<li class="mb-1">'+f+'</li>').join('') + '</ul>';
+}
+
+function buildPerformanceTab(perf) {
+    document.getElementById('perf-metrics-table').innerHTML =
+        '<tr><td class="text-muted">F1 Score</td><td class="text-end"><strong style="font-family:var(--mono);">'+perf.f1+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Precision</td><td class="text-end"><strong style="font-family:var(--mono);">'+perf.precision+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Recall</td><td class="text-end"><strong style="font-family:var(--mono);">'+perf.recall+'</strong></td></tr>' +
+        '<tr><td class="text-muted">Accuracy</td><td class="text-end"><strong style="font-family:var(--mono);">'+perf.accuracy+'</strong></td></tr>' +
+        '<tr><td class="text-muted">True Positives</td><td class="text-end"><strong>'+perf.tp+'</strong></td></tr>' +
+        '<tr><td class="text-muted">False Positives</td><td class="text-end"><strong>'+perf.fp+'</strong></td></tr>' +
+        '<tr><td class="text-muted">False Negatives</td><td class="text-end"><strong>'+perf.fn+'</strong></td></tr>' +
+        '<tr><td class="text-muted">True Negatives</td><td class="text-end"><strong>'+perf.tn+'</strong></td></tr>';
+
+    // Confusion matrix chart
+    new Chart(document.getElementById('chart-confusion'), {
+        type: 'bar',
+        data: {
+            labels: ['True Pos', 'False Pos', 'False Neg', 'True Neg'],
+            datasets: [{ data: [perf.tp, perf.fp, perf.fn, perf.tn], backgroundColor: ['#2ecc71','#f39c12','#e74c3c','#0984e3'], borderRadius: 4 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: {legend:{display:false}}, scales: {y:{beginAtZero:true}} }
+    });
+
+    // Baseline comparison
+    document.getElementById('baseline-comparison').innerHTML =
+        '<table class="table table-sm" style="font-size:0.82rem;">' +
+        '<tr><th>Metric</th><th>This Dataset</th><th>Baseline</th></tr>' +
+        '<tr><td>F1</td><td><strong>'+perf.f1+'</strong></td><td>0.8646</td></tr>' +
+        '<tr><td>Precision</td><td><strong>'+perf.precision+'</strong></td><td>0.9297</td></tr>' +
+        '<tr><td>Recall</td><td><strong>'+perf.recall+'</strong></td><td>0.8079</td></tr>' +
+        '</table>';
+
+    // Missed frauds
+    const mb = document.getElementById('missed-body');
+    mb.innerHTML = '';
+    (perf.missed_frauds||[]).forEach(r => {
+        mb.innerHTML += '<tr><td>'+r.transaction_id+'</td><td>$'+r.amount.toFixed(2)+'</td><td>'+r.hour+':00</td><td style="font-family:var(--mono);">'+(r.probability*100).toFixed(1)+'%</td><td class="small">Low probability - looks like normal transaction</td></tr>';
+    });
+
+    // False positives
+    const fb = document.getElementById('fp-body');
+    fb.innerHTML = '';
+    (perf.false_positives||[]).forEach(r => {
+        fb.innerHTML += '<tr><td>'+r.transaction_id+'</td><td>$'+r.amount.toFixed(2)+'</td><td>'+r.hour+':00</td><td style="font-family:var(--mono);">'+(r.probability*100).toFixed(1)+'%</td><td class="small">High amount/velocity triggered false alarm</td></tr>';
+    });
+}
+
+// Transaction table functions
+function getFiltered() {
+    let results = currentFilter === 'all' ? allResults : allResults.filter(r => r.classification === currentFilter);
+    if (searchQuery) {
+        results = results.filter(r =>
+            (r.transaction_id && r.transaction_id.toLowerCase().includes(searchQuery)) ||
+            (r.category && r.category.toLowerCase().includes(searchQuery))
+        );
+    }
+    return results;
+}
+
+function renderTable() {
+    const filtered = getFiltered();
+    const start = currentPage * PAGE_SIZE;
+    const page = filtered.slice(start, start + PAGE_SIZE);
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = '';
+    page.forEach((r, i) => {
+        const prob = r.probability || 0;
+        const pct = (prob*100).toFixed(1);
+        const color = prob >= 0.8 ? '#e74c3c' : prob >= 0.5 ? '#f39c12' : prob >= 0.2 ? '#f1c40f' : '#2ecc71';
+        const row = document.createElement('tr');
+        row.className = 'alert-row-' + (r.classification||'');
+        row.style.cursor = 'pointer';
+        row.title = 'Click to see SHAP explanation';
+        row.onclick = () => openShapForResult(start + i);
+        row.innerHTML = '<td>'+(start+i+1)+'</td><td><strong style="font-family:var(--mono);">$'+(r.amount||0).toFixed(2)+'</strong></td><td>'+
+            (r.category||'-')+'</td><td>'+(r.hour||'-')+':00</td><td><div class="d-flex align-items-center gap-2"><div class="prob-meter flex-grow-1"><div class="fill" style="width:'+pct+'%;background:'+color+';"></div></div><span style="font-family:var(--mono);font-size:0.78rem;font-weight:600;color:'+color+';">'+pct+'%</span></div></td><td><span class="badge badge-'+(r.risk_level||'LOW')+'">'+(r.risk_level||'LOW')+'</span></td><td><span class="badge badge-'+(r.classification||'NORMAL')+'">'+(r.classification||'NORMAL')+'</span></td><td class="small">'+(r.rule_triggers&&r.rule_triggers.length?r.rule_triggers.join(', '):'ML detection')+'</td><td><button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();openShapForResult('+(start+i)+')">Explain</button></td>';
+        tbody.appendChild(row);
+    });
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    document.getElementById('pagination').innerHTML = '<small class="text-muted">'+Math.min(start+1,filtered.length)+'-'+Math.min(start+PAGE_SIZE,filtered.length)+' of '+filtered.length+'</small>' +
+        (totalPages > 1 ? (currentPage > 0 ? '<button class="btn btn-sm btn-outline-secondary" onclick="goPage('+(currentPage-1)+')">Prev</button> ' : '') + 'Page '+(currentPage+1)+'/'+totalPages + (currentPage < totalPages-1 ? ' <button class="btn btn-sm btn-outline-secondary" onclick="goPage('+(currentPage+1)+')">Next</button>' : '') : '');
+}
+
+function filterResults(cls, btn) { currentFilter = cls; currentPage = 0; searchQuery = ''; document.getElementById('search-input').value = ''; document.querySelectorAll('.nav-link-filter,.btn-outline-dark,.btn-outline-danger,.btn-outline-warning,.btn-outline-success').forEach(b=>b.classList.remove('active')); if(btn)btn.classList.add('active'); renderTable(); }
+function goPage(p) { currentPage = p; renderTable(); }
+function searchResults(q) { searchQuery = q.toLowerCase().trim(); currentPage = 0; renderTable(); }
+
+function openShapForResult(idx) {
+    const r = getFiltered()[idx]; if (!r) return;
+    if (!r.features) {
+        showToast('Feature data not available for this transaction', 'info');
+        return;
+    }
+    showExplanationModal(r.features, {
+        transaction_id: r.transaction_id,
+        amount: r.amount,
+        category: r.category,
+        hour: r.hour,
+        probability: r.probability,
+        classification: r.classification,
+    });
+}
+
+function viewDetails(idx) {
+    const r = getFiltered()[idx]; if (!r) return;
+    openShapForResult(idx);
+}
+
+function resetAnalysis() {
+    allResults = []; analysisData = null;
+    document.getElementById('state-results').style.display = 'none';
+    document.getElementById('state-upload').style.display = 'block';
+    document.getElementById('detail-panel').style.display = 'none';
+    document.getElementById('model-stale-banner').style.display = 'none';
+}
+
+// ---- Model selector ----
+let _lastUsedModel = null;
+
+function switchModel(code) {
+    const status = document.getElementById('model-switch-status');
+    status.textContent = 'Switching...';
+    fetch('/api/model/switch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({model: code})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.display_name) {
+            status.textContent = '✓ Active: ' + d.display_name;
+            // Instantly update sidebar badge
+            const mb = document.getElementById('active-model-badge');
+            if (mb) mb.textContent = 'Model: ' + d.display_name;
+            // Show stale banner if results already on screen
+            if (document.getElementById('state-results').style.display !== 'none' && _lastUsedModel && _lastUsedModel !== code) {
+                document.getElementById('model-stale-banner').style.display = 'block';
+            }
+            setTimeout(() => { status.textContent = ''; }, 3000);
+        } else {
+            status.textContent = '✗ Failed: ' + (d.error || 'unknown error');
+            // Revert dropdown
+            document.getElementById('model-select').value = _lastUsedModel || 'ae_bds_xgboost';
+        }
+    })
+    .catch(() => {
+        status.textContent = '✗ Network error';
+        document.getElementById('model-select').value = _lastUsedModel || 'ae_bds_xgboost';
+    });
+}
+
+// Initialise — set model on page load to match default dropdown selection
+(function() {
+    const sel = document.getElementById('model-select');
+    if (sel) switchModel(sel.value);
+})();
+
+function downloadResults() {
+    let csv = 'transaction_id,amount,category,hour,probability,risk_level,classification,rule_triggers\n';
+    allResults.forEach(r => {
+        csv += [r.transaction_id, r.amount||0, r.category||'', r.hour||'', r.probability||0, r.risk_level||'', r.classification||'', (r.rule_triggers||[]).join(';')].join(',') + '\n';
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+    a.download = 'fraudlens_analysis.csv';
+    a.click();
+}
+
+// ---- PDF Report ----
+function openReportModal() {
+    if (!analysisData || !allResults.length) {
+        showToast('Run an analysis first before generating a report.', 'warning');
+        return;
+    }
+    document.getElementById('rpt-status').textContent = '';
+    document.getElementById('rpt-generate-btn').disabled = false;
+    document.getElementById('rpt-generate-btn').textContent = 'Generate Report';
+    document.getElementById('report-modal').style.display = 'block';
+}
+
+function generateReport() {
+    const btn = document.getElementById('rpt-generate-btn');
+    const status = document.getElementById('rpt-status');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
+    status.textContent = 'Building PDF — this may take 10-20 seconds...';
+    status.style.color = '#636e72';
+
+    const sel = document.getElementById('model-select');
+    const modelLabel = sel ? sel.options[sel.selectedIndex].text : 'FraudLens Model';
+
+    // Build top transactions list (top 50 by probability, with features)
+    const sorted = [...allResults].sort((a, b) => (b.probability||0) - (a.probability||0));
+    const topTxns = sorted.slice(0, 50).map(r => ({
+        transaction_id: r.transaction_id,
+        amount: r.amount || 0,
+        category: r.category || 'unknown',
+        hour: r.hour || 0,
+        probability: r.probability || 0,
+        risk_level: r.risk_level || 'LOW',
+        classification: r.classification || 'NORMAL',
+        rule_triggers: r.rule_triggers || [],
+        features: r.features || null,
+    }));
+
+    const payload = {
+        // Config
+        institution_name: document.getElementById('rpt-institution').value || 'Financial Institution',
+        prepared_by: document.getElementById('rpt-preparer').value || 'Fraud Analytics Team',
+        classification: document.getElementById('rpt-classification').value || 'CONFIDENTIAL',
+        include_recommendations: document.getElementById('rpt-inc-recommend').checked,
+        include_appendix: document.getElementById('rpt-inc-appendix').checked,
+        // Data
+        total: analysisData.total,
+        counts: analysisData.counts,
+        amount_at_risk: analysisData.amount_at_risk,
+        amount_safe: analysisData.amount_safe,
+        amount_stats: analysisData.amount_stats,
+        prob_distribution: analysisData.prob_distribution,
+        hour_counts: analysisData.hour_counts,
+        hour_fraud: analysisData.hour_fraud,
+        category_counts: analysisData.category_counts,
+        category_fraud: analysisData.category_fraud,
+        performance: analysisData.performance || null,
+        top_transactions: topTxns,
+        model_display: modelLabel,
+        filename: document.getElementById('results-subtitle').textContent,
+    };
+
+    fetch('/api/report/generate', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload),
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success && d.download_url) {
+            status.textContent = 'Report ready! Downloading...';
+            status.style.color = '#2ecc71';
+            // Trigger download
+            const a = document.createElement('a');
+            a.href = d.download_url;
+            a.download = d.report_id + '.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            btn.disabled = false;
+            btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Generate Report';
+            setTimeout(() => { document.getElementById('report-modal').style.display = 'none'; }, 1500);
+        } else {
+            throw new Error(d.error || 'Generation failed');
+        }
+    })
+    .catch(err => {
+        status.textContent = 'Error: ' + err.message;
+        status.style.color = '#e74c3c';
+        btn.disabled = false;
+        btn.innerHTML = 'Retry';
+    });
+}
+
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('report-modal').style.display !== 'none') {
+        document.getElementById('report-modal').style.display = 'none';
+    }
+});
+document.getElementById('report-modal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+</script>
+{% endblock %}

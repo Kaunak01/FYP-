@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Predict — Fraud Detection System{% endblock %}
+{% block content %}
+<h4 class="mb-4">Predict Single Transaction</h4>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h6>Transaction Details</h6>
+            <form id="predict-form">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Amount ($)</label>
+                        <input type="number" class="form-control" name="amount" step="0.01" value="500" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Merchant Category</label>
+                        <select class="form-select" name="merchant_category">
+                            <option value="entertainment">Entertainment</option>
+                            <option value="food_dining">Food & Dining</option>
+                            <option value="gas_transport">Gas & Transport</option>
+                            <option value="grocery_net">Grocery (Online)</option>
+                            <option value="grocery_pos" selected>Grocery (In-store)</option>
+                            <option value="health_fitness">Health & Fitness</option>
+                            <option value="home">Home</option>
+                            <option value="kids_pets">Kids & Pets</option>
+                            <option value="misc_net">Misc (Online)</option>
+                            <option value="misc_pos">Misc (In-store)</option>
+                            <option value="personal_care">Personal Care</option>
+                            <option value="shopping_net">Shopping (Online)</option>
+                            <option value="shopping_pos">Shopping (In-store)</option>
+                            <option value="travel">Travel</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Transaction Time</label>
+                        <input type="datetime-local" class="form-control" name="timestamp" value="2024-03-15T23:45">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Age</label>
+                        <input type="number" class="form-control" name="cardholder_age" value="34">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Gender</label>
+                        <select class="form-select" name="cardholder_gender">
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">City Population</label>
+                        <input type="number" class="form-control" name="city_population" value="50000">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Card Number (for history)</label>
+                        <input type="text" class="form-control" name="card_number" value="CARD-DEMO-001" placeholder="e.g. CARD-001">
+                    </div>
+                    <div class="col-12">
+                        <hr>
+                        <small class="text-muted">Optional: Velocity features (leave blank to compute from card history)</small>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Velocity 1h</label>
+                        <input type="number" class="form-control" name="velocity_1h" placeholder="Auto">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Velocity 24h</label>
+                        <input type="number" class="form-control" name="velocity_24h" placeholder="Auto">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Amt Velocity 1h</label>
+                        <input type="number" class="form-control" name="amount_velocity_1h" step="0.01" placeholder="Auto">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-danger mt-3 w-100">Analyze Transaction</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div id="result-container" style="display:none;">
+            <!-- Probability -->
+            <div id="result-card" class="prediction-result">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 id="result-headline" class="mb-1"></h5>
+                        <span id="result-classification" class="badge fs-6"></span>
+                        <span id="result-risk" class="badge fs-6 ms-1"></span>
+                    </div>
+                    <div class="text-end">
+                        <div id="result-prob" class="stat-value"></div>
+                        <small class="text-muted" id="result-time"></small>
+                    </div>
+                </div>
+                <div class="prob-meter mt-2">
+                    <div id="prob-fill" class="fill"></div>
+                </div>
+            </div>
+
+            <!-- SHAP Chart -->
+            <div class="card p-3 mt-3">
+                <h6>Why This Decision</h6>
+                <canvas id="shapChart" height="250"></canvas>
+            </div>
+
+            <!-- Recommendation -->
+            <div class="card p-3 mt-3">
+                <h6>Recommendation</h6>
+                <div id="result-recommendation"></div>
+            </div>
+
+            <!-- Rules -->
+            <div id="rules-section" class="card p-3 mt-3" style="display:none;">
+                <h6>Triggered Rules</h6>
+                <div id="result-rules"></div>
+            </div>
+
+            <!-- Velocity Info -->
+            <div class="card p-3 mt-3">
+                <h6>Velocity Information</h6>
+                <div id="velocity-info"></div>
+            </div>
+        </div>
+        <div id="result-placeholder" class="card p-4 text-center text-muted">
+            <p>Enter transaction details and click "Analyze Transaction" to see results.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let shapChartInstance = null;
+
+document.getElementById('predict-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const form = new FormData(this);
+    const data = {};
+    form.forEach((val, key) => {
+        if (val !== '' && val !== null) {
+            data[key] = isNaN(val) ? val : parseFloat(val);
+        }
+    });
+
+    // Convert datetime-local format
+    if (data.timestamp) {
+        data.timestamp = data.timestamp.replace('T', ' ') + ':00';
+    }
+
+    fetch('/api/predict', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(result => {
+        document.getElementById('result-placeholder').style.display = 'none';
+        document.getElementById('result-container').style.display = 'block';
+
+        const prob = result.probability;
+        const pct = (prob * 100).toFixed(1);
+        const risk = result.risk_level;
+        const cls = result.classification;
+        const report = result.report;
+
+        // Header
+        document.getElementById('result-headline').textContent = report.risk_assessment.headline;
+        document.getElementById('result-prob').textContent = pct + '%';
+        document.getElementById('result-time').textContent = result.processing_time_ms.toFixed(2) + ' ms';
+
+        const clsBadge = document.getElementById('result-classification');
+        clsBadge.textContent = cls;
+        clsBadge.className = 'badge fs-6 badge-' + cls;
+
+        const riskBadge = document.getElementById('result-risk');
+        riskBadge.textContent = risk;
+        riskBadge.className = 'badge fs-6 badge-' + risk;
+
+        // Result card color
+        const card = document.getElementById('result-card');
+        card.className = 'prediction-result ' + risk;
+
+        // Probability bar
+        const fill = document.getElementById('prob-fill');
+        fill.style.width = pct + '%';
+        fill.style.background = prob >= 0.8 ? '#e74c3c' : prob >= 0.5 ? '#f39c12' : prob >= 0.2 ? '#f1c40f' : '#2ecc71';
+
+        // Recommendation
+        document.getElementById('result-recommendation').innerHTML =
+            '<strong>' + report.recommendation.action + '</strong><br>' + report.recommendation.detail;
+
+        // Rules
+        const rulesDiv = document.getElementById('rules-section');
+        if (report.rules && report.rules.length > 0) {
+            rulesDiv.style.display = 'block';
+            document.getElementById('result-rules').innerHTML = report.rules.map(r =>
+                '<div class="alert alert-warning py-1 mb-1"><strong>[' + r.level + ']</strong> ' + r.reason + '</div>'
+            ).join('');
+        } else {
+            rulesDiv.style.display = 'none';
+        }
+
+        // Velocity info
+        document.getElementById('velocity-info').innerHTML =
+            '<small>Source: <strong>' + result.velocity_source + '</strong></small>';
+
+        // SHAP chart
+        if (report.shap_chart_data) {
+            if (shapChartInstance) shapChartInstance.destroy();
+            const ctx = document.getElementById('shapChart').getContext('2d');
+            shapChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: report.shap_chart_data.labels,
+                    datasets: [{
+                        data: report.shap_chart_data.values,
+                        backgroundColor: report.shap_chart_data.colors,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'SHAP Value (impact on prediction)' } }
+                    }
+                }
+            });
+        }
+    })
+    .catch(err => {
+        alert('Error: ' + err.message);
+    });
+});
+</script>
+{% endblock %}

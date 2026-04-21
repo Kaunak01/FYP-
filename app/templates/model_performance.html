@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Model Performance — Fraud Detection System{% endblock %}
+{% block content %}
+<h4 class="mb-4">Model Performance & Drift Monitoring</h4>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h6>Active Model</h6>
+            <div class="fs-5 fw-bold">{{ model_info.active_model }}</div>
+            <small class="text-muted">{{ model_info.feature_count }} features</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h6>Baseline F1</h6>
+            <div class="fs-5 fw-bold">0.8646</div>
+            <small class="text-muted">Test set performance</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h6>Drift Status</h6>
+            <div id="drift-status" class="fs-5 fw-bold text-success">GREEN</div>
+            <small class="text-muted">No drift detected</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h6>Available Models</h6>
+            {% for m in model_info.available_models %}
+            <div>
+                <span class="badge {{ 'bg-danger' if m == model_info.active_model else 'bg-secondary' }}">{{ m }}</span>
+                {% if m != model_info.active_model %}
+                <button class="btn btn-sm btn-link p-0" onclick="switchModel('{{ m }}')">Switch</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card p-3 mb-3">
+    <h6>Baseline Metrics (Test Set)</h6>
+    <table class="table table-sm">
+        <tr><th>Metric</th><th>Value</th><th>Interpretation</th></tr>
+        <tr><td>F1 Score</td><td>0.8646</td><td>Harmonic mean of precision and recall</td></tr>
+        <tr><td>Precision</td><td>0.9297</td><td>93% of flagged transactions are actually fraud</td></tr>
+        <tr><td>Recall</td><td>0.8079</td><td>81% of all frauds are detected</td></tr>
+        <tr><td>ROC-AUC</td><td>0.9972</td><td>Near-perfect ranking ability</td></tr>
+        <tr><td>Throughput</td><td>826K txns/sec</td><td>Well within banking latency requirements</td></tr>
+    </table>
+</div>
+
+<div class="card p-3">
+    <h6>Drift Monitoring</h6>
+    <p class="text-muted">The system uses Population Stability Index (PSI) to detect data drift.
+    PSI &lt; 0.1 = no drift, 0.1-0.25 = moderate drift, &gt; 0.25 = significant drift requiring retraining.</p>
+    <button class="btn btn-outline-primary" onclick="checkDrift()">Run Drift Check</button>
+    <div id="drift-results" class="mt-3"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchModel(name) {
+    fetch('/api/model/switch', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({model_name: name})
+    }).then(r => r.json()).then(d => {
+        if (d.status === 'ok') location.reload();
+        else alert(d.error);
+    });
+}
+
+function checkDrift() {
+    fetch('/api/model/performance')
+        .then(r => r.json())
+        .then(data => {
+            const div = document.getElementById('drift-results');
+            const d = data.drift;
+            div.innerHTML = '<div class="alert alert-' +
+                (d.overall_status === 'GREEN' ? 'success' : d.overall_status === 'YELLOW' ? 'warning' : 'danger') +
+                '"><strong>' + d.overall_status + '</strong>: ' + d.summary + '</div>';
+            document.getElementById('drift-status').textContent = d.overall_status;
+        });
+}
+</script>
+{% endblock %}

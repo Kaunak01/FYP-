@@ -1,0 +1,62 @@
+[2026-04-21 23:57:34] ======================================================================
+[2026-04-21 23:57:34] GAP EXPERIMENTS RUNNER — 5 experiments sequential
+[2026-04-21 23:57:34] Python 3.14.3 | torch 2.11.0+cpu | seed=42
+[2026-04-21 23:57:34] Train: fraudTrain_engineered_with_ids.csv  Test: fraudTest_engineered_with_ids.csv
+[2026-04-21 23:57:34] ======================================================================
+[2026-04-21 23:57:34] 
+### EXPERIMENT 1/5: LSTM_reproduced_baseline ###
+[2026-04-21 23:57:38] EXPERIMENT: LSTM_reproduced_baseline — loading data
+[2026-04-21 23:57:44]   building sequences (train)  rows=1,296,675 feats=14
+[2026-04-21 23:57:50]   building sequences (test)   rows=555,719
+[2026-04-21 23:57:52]   class_weight = {0:1, 1:171.75}
+[2026-04-21 23:57:52]   compiling Keras model (LSTM64 + Dropout0.3 + Dense32 + Dense16 + Sigmoid)
+[2026-04-21 23:57:52]   training LSTM (5 epochs, batch=512, val_split=0.1) — this is the long step
+[2026-04-22 00:03:43]   producing LSTM probabilities
+[2026-04-22 00:04:14]   fitting Random Forest on [LSTM_prob + static features]
+[2026-04-22 00:05:31]   SAVED @ thr=0.5 | F1=0.7892 P=0.6770 R=0.9459 ROC=0.9981 | runtime=473s
+[2026-04-22 00:05:31] 
+### EXPERIMENT 2/5: LSTM_no_velocity ###
+[2026-04-22 00:05:31] EXPERIMENT: LSTM_no_velocity — loading data
+[2026-04-22 00:05:38]   building sequences (train)  rows=1,296,675 feats=11
+[2026-04-22 00:05:44]   building sequences (test)   rows=555,719
+[2026-04-22 00:05:47]   class_weight = {0:1, 1:171.75}
+[2026-04-22 00:05:47]   compiling Keras model (LSTM64 + Dropout0.3 + Dense32 + Dense16 + Sigmoid)
+[2026-04-22 00:05:47]   training LSTM (5 epochs, batch=512, val_split=0.1) — this is the long step
+[2026-04-22 00:13:33]   producing LSTM probabilities
+[2026-04-22 00:14:14]   fitting Random Forest on [LSTM_prob + static features]
+[2026-04-22 00:15:37]   SAVED @ thr=0.5 | F1=0.7766 P=0.6596 R=0.9441 ROC=0.9981 | runtime=605s
+[2026-04-22 00:15:37] 
+### EXPERIMENT 3/5: LSTM_with_velocity (cross-reference) ###
+[2026-04-22 00:15:37]   cross-referenced: F1=0.7892
+[2026-04-22 00:15:37] 
+### EXPERIMENT 4/5: XGBoost_ADASYN ###
+[2026-04-22 00:15:38] EXPERIMENT: XGBoost_ADASYN
+[2026-04-22 00:15:45]   reused XGBoost tuned params from joblib: {'n_estimators': 400, 'max_depth': 10, 'learning_rate': 0.05, 'subsample': 0.8, 'colsample_bytree': 0.7, 'min_child_weight': 1, 'gamma': 0, 'reg_alpha': None, 'reg_lambda': None}
+[2026-04-22 00:15:45]   trying ADASYN {'sampling_strategy': 1.0, 'n_neighbors': 5}
+[2026-04-22 00:15:55]   ADASYN OK — resampled shape (2579280, 14), fraud=1,290,111
+[2026-04-22 00:15:55]   fitting XGBoost on ADASYN-resampled train
+[2026-04-22 00:16:49]   SAVED @ thr=0.5 | F1=0.8640 P=0.9296 R=0.8070 ROC=0.9973
+[2026-04-22 00:16:50]   SAVED @ thr=0.7 | F1=0.8600 P=0.9663 R=0.7748 ROC=0.9973
+[2026-04-22 00:16:50] 
+### EXPERIMENT 5/5: XGBoost_FocalLoss ###
+[2026-04-22 00:16:50] EXPERIMENT: XGBoost_FocalLoss
+[2026-04-22 00:16:56]   reused XGBoost tuned params from joblib: {'n_estimators': 400, 'max_depth': 10, 'learning_rate': 0.05, 'subsample': 0.8, 'colsample_bytree': 0.7, 'min_child_weight': 1, 'gamma': 0, 'reg_alpha': None, 'reg_lambda': None}
+[2026-04-22 00:16:56]   focal-loss: gamma=2.0, alpha=0.9942 (=1-fraud_rate)
+[2026-04-22 00:16:56]   fitting XGBoost with custom focal-loss objective (no resampling)
+[2026-04-22 00:18:08]   SAVED @ thr=0.5 | F1=0.0000 P=0.0000 R=0.0000 ROC=0.7848
+[2026-04-22 00:18:08]   SAVED @ thr=0.7 | F1=0.0000 P=0.0000 R=0.0000 ROC=0.7848
+[2026-04-22 00:18:09] ======================================================================
+[2026-04-22 00:18:09] ALL EXPERIMENTS COMPLETE. Total runtime: 0h 20m 34s
+[2026-04-22 00:18:09] Results: verified_metrics.json (gap_experiments key)
+[2026-04-22 00:18:09] Log:     FEEDBACK_GAPS_RUN_LOG.txt
+[2026-04-22 00:18:09] ======================================================================
+[2026-04-22 00:19:38] 
+[2026-04-22 00:19:38] ### EXPERIMENT 5 FALLBACK: XGBoost_FocalLoss -> BalancedBagging ###
+[2026-04-22 00:19:45]   loaded train=1,296,675 test=555,719 fraud_rate_train=0.5789%
+[2026-04-22 00:19:46]   reused XGBoost tuned params: {'n_estimators': 400, 'max_depth': 10, 'learning_rate': 0.05, 'subsample': 0.8, 'colsample_bytree': 0.7, 'min_child_weight': 1, 'gamma': 0}
+[2026-04-22 00:19:46]   fitting BalancedBaggingClassifier(XGB tuned, n_estimators=10, ss=1.0)
+[2026-04-22 00:20:03]   fit done in 24.4s
+[2026-04-22 00:20:14]   SAVED @ thr=0.5 | F1=0.3511 P=0.2148 R=0.9608 ROC=0.9976
+[2026-04-22 00:20:15]   SAVED @ thr=0.7 | F1=0.4639 P=0.3075 R=0.9445 ROC=0.9976
+[2026-04-22 00:20:15]   appended 2 rows to verified_metrics.json[gap_experiments]
+[2026-04-22 00:20:15] FALLBACK COMPLETE in 36.3s

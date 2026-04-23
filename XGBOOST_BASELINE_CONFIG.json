@@ -1,0 +1,137 @@
+{
+  "_meta": {
+    "purpose": "Frozen config for XGBoost SMOTE+tuned baseline — source of truth for Experiments 3 (ADASYN) and 4 (Focal Loss)",
+    "extracted_from": "FYP_Autoencoder_XGBoost.ipynb",
+    "extracted_on": "2026-04-21",
+    "ambiguity_note": "Two SMOTE+tuned runs exist: (A) pure XGBoost on 14 feats (F1=0.8646 per verified_metrics.json 'XGBoost SMOTE+tuned'), and (B) AE+XGBoost on 15 feats incl. recon_error (F1=0.869 per 'AE + XGBoost SMOTE+tuned'). Task spec says F1=0.8646 → use config A (14 feats, no recon_error) for Exp 3+4."
+  },
+
+  "target_baseline": "XGBoost SMOTE+tuned (14 features, no AE)",
+  "baseline_metrics": {
+    "f1_thr_0_5": 0.8646,
+    "precision_thr_0_5": 0.9297,
+    "recall_thr_0_5": 0.8079,
+    "roc_auc": 0.9972,
+    "f1_thr_0_7": 0.8605,
+    "precision_thr_0_7": 0.9647,
+    "recall_thr_0_7": 0.7767
+  },
+
+  "xgboost_hyperparameters": {
+    "fixed": {
+      "eval_metric": "logloss",
+      "random_state": 42,
+      "n_jobs": -1,
+      "objective": "binary:logistic (default)",
+      "scale_pos_weight": "NOT USED — SMOTE balances classes instead (for Exp 4 focal loss, also NOT USED)"
+    },
+    "tuned_via_RandomizedSearchCV_search_space": {
+      "n_estimators": [200, 300, 400],
+      "max_depth": [4, 6, 8, 10],
+      "learning_rate": [0.01, 0.05, 0.1],
+      "subsample": [0.7, 0.8, 0.9],
+      "colsample_bytree": [0.7, 0.8, 0.9],
+      "min_child_weight": [1, 3, 5],
+      "gamma": [0, 0.1, 0.2]
+    },
+    "reg_alpha_default": 0,
+    "reg_lambda_default": 1,
+    "best_params_persistence": "NOT hardcoded — only printed at runtime. Saved .joblib file (xgboost_smote_tuned.joblib) contains the fitted model; extract best_params from there via joblib.load().get_params()"
+  },
+
+  "smote_config_for_reference": {
+    "class": "imblearn.over_sampling.SMOTE",
+    "sampling_strategy": "auto (default — balance minority to majority)",
+    "k_neighbors": 5,
+    "random_state": 42,
+    "applied_to": "X_train only, AFTER train/test split (pre-split CSVs are used directly). Test set NEVER receives SMOTE."
+  },
+
+  "input_features_14": [
+    "amt", "city_pop", "age", "hour", "month",
+    "distance_cardholder_merchant", "category_encoded", "gender_encoded",
+    "day_of_week_encoded", "is_weekend", "is_night",
+    "velocity_1h", "velocity_24h", "amount_velocity_1h"
+  ],
+  "feature_selection_logic": "drop_cols = ['is_fraud', 'unix_time']; feature_cols = all other columns of fraudTrain_engineered.csv after dropping those.",
+
+  "train_test_split": {
+    "method": "Pre-split files used directly — fraudTrain_engineered.csv as train, fraudTest_engineered.csv as test",
+    "no_sklearn_split": true
+  },
+
+  "preprocessing": {
+    "scaling": "NONE — XGBoost on raw (unscaled) features. StandardScaler was only applied to AE input in AE+XGBoost path.",
+    "label_encoding": "Already applied upstream (category_encoded, gender_encoded, day_of_week_encoded)",
+    "feature_order": "Use column order from feature_cols list above"
+  },
+
+  "tuning_procedure": {
+    "method": "sklearn.model_selection.RandomizedSearchCV",
+    "n_iter": 30,
+    "cv": 3,
+    "scoring": "f1",
+    "random_state": 42,
+    "verbose": 1,
+    "n_jobs": -1
+  },
+
+  "experiment_3_adasyn_plan": {
+    "oversampler": "imblearn.over_sampling.ADASYN",
+    "sampling_strategy": 1.0,
+    "n_neighbors": 5,
+    "random_state": 42,
+    "applied_to": "train only, post-split",
+    "xgboost_reuse": "Load xgboost_smote_tuned.joblib to extract tuned hyperparameters; refit a fresh XGBClassifier with those params on ADASYN-resampled train",
+    "fallback_chain": [
+      "If ADASYN fails: retry with n_neighbors=3",
+      "If still fails: retry with sampling_strategy=0.5",
+      "If still fails: log failure honestly in verified_metrics.json, move on"
+    ],
+    "evaluation": "threshold 0.5 AND 0.7"
+  },
+
+  "experiment_4_focal_loss_plan": {
+    "objective": "custom focal loss via XGBoost's `obj` parameter",
+    "formula": "FL(p) = -(1-p)^gamma * log(p) for positives, -(p)^gamma * log(1-p) for negatives",
+    "gamma": 2.0,
+    "alpha": "inverse class frequency (n_neg / (n_pos + n_neg))",
+    "resampling": "NONE — focal loss handles imbalance internally",
+    "class_weight": "NONE — focal loss + alpha handles it",
+    "xgboost_reuse": "Same tuned hyperparameters minus objective; set custom obj function",
+    "fallback": "If custom gradient/hessian fails: use imblearn.ensemble.BalancedBaggingClassifier with XGBClassifier base estimator. Label result 'XGBoost_BalancedBagging (Focal Loss unavailable)'.",
+    "evaluation": "threshold 0.5 AND 0.7"
+  },
+
+  "red_flags": [
+    "Data leakage via SMOTE inside RandomizedSearchCV CV folds (moderate): X_train_smote is created ONCE before search.fit(), so each CV validation fold sees SMOTE-synthesized samples derived from its own training portion. Inflates CV F1 but does NOT contaminate test (SMOTE not applied to test). Fix would require imblearn Pipeline. For Exp 3 same issue will apply unless fixed — recommend using tuned hyperparameters from .joblib and skipping re-tuning (re-tuning would be a different experiment anyway).",
+    "Autoencoder is non-deterministic (no torch.manual_seed) in the 15-feature AE+XGBoost path. Not relevant for Exp 3/4 since those use 14-feature (no AE) path.",
+    "Best hyperparameters only printed, not saved as code. Must load from xgboost_smote_tuned.joblib (.get_params()) to reuse.",
+    "No explicit tree_method set — relies on XGBoost 3.2.0 defaults (hist on CPU). Should be set explicitly for reproducibility.",
+    "reg_alpha / reg_lambda not tuned — defaults used. Not a bug but note.",
+    "Paths are relative (good, works locally without edits).",
+    "Test set never contaminated. Clean separation.",
+    "XGBoost 3.2.0 behavior may differ from whatever version was used to produce F1=0.8646 — version drift risk. Check xgboost version compatibility of xgboost_smote_tuned.joblib."
+  ],
+
+  "blockers_to_deterministic_rerun": [
+    "Extract best_params from xgboost_smote_tuned.joblib before running Exp 3/4",
+    "Verify xgboost 3.2.0 loads the .joblib (version mismatch possible)",
+    "Set tree_method='hist' explicitly",
+    "For GPU speedup: set tree_method='hist' + device='cuda' (xgboost 2+ syntax) IF a CUDA-aware xgboost install is available"
+  ],
+
+  "baseline_cw_config_for_reference": {
+    "model": "XGBoost Baseline (Class Weights) — 14 features",
+    "hyperparameters": {
+      "n_estimators": 200,
+      "max_depth": 6,
+      "learning_rate": 0.1,
+      "eval_metric": "logloss",
+      "random_state": 42,
+      "scale_pos_weight": "n_normal / n_fraud (~172)"
+    },
+    "feature_set": "Same 14 features as SMOTE+tuned (no recon_error)",
+    "note": "This is the 'class weighting' row in Gap 2 table (F1=0.656 at thr 0.7)"
+  }
+}

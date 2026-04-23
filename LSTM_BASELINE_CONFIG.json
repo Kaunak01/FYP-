@@ -1,0 +1,121 @@
+{
+  "_meta": {
+    "purpose": "Frozen config for LSTM+RF v2 baseline (F1=0.4747) — source of truth for Experiments 1 (no-velocity) and 2 (with-velocity)",
+    "extracted_from": "FYP_Hybrid_Model.ipynb cell 12 (HYBRID v2)",
+    "extracted_on": "2026-04-21",
+    "framework": "Keras / TensorFlow (NOT PyTorch) — see critical_blocker_1 in red_flags"
+  },
+
+  "variant": "Hybrid v2: LSTM sigmoid probability + RF",
+  "baseline_metrics": {
+    "f1": 0.4747,
+    "precision": 0.3234,
+    "recall": 0.8923,
+    "roc_auc": 0.9939,
+    "accuracy": 0.9924,
+    "threshold": 0.5
+  },
+
+  "lstm_architecture": {
+    "framework": "keras",
+    "input_shape_with_velocity": [5, 14],
+    "input_shape_without_velocity": [5, 11],
+    "layers": [
+      {"type": "LSTM", "units": 64, "return_sequences": false, "bidirectional": false, "activation": "tanh (default)"},
+      {"type": "Dropout", "rate": 0.3},
+      {"type": "Dense", "units": 32, "activation": "relu"},
+      {"type": "Dense", "units": 16, "activation": "relu", "name": "lstm_features"},
+      {"type": "Dense", "units": 1, "activation": "sigmoid"}
+    ],
+    "total_params_14feat": 22832
+  },
+
+  "sequence_construction": {
+    "seq_len": 5,
+    "method": "per-cardholder (cc_num), sorted by trans_date_trans_time ascending, sliding window including current transaction",
+    "padding": "zeros prepended when card history < seq_len",
+    "cc_num_reattachment": "positional .values from fraudTrain.csv / fraudTest.csv — assumes row order preserved between original and engineered CSVs"
+  },
+
+  "lstm_training": {
+    "epochs": 5,
+    "batch_size": 512,
+    "optimizer": "adam",
+    "learning_rate": 0.001,
+    "loss": "binary_crossentropy",
+    "metrics": ["accuracy"],
+    "class_weight": {"0": 1, "1": 171.8},
+    "validation_split": 0.1,
+    "shuffle": "Keras default (True)"
+  },
+
+  "input_features_14_with_velocity": [
+    "amt", "city_pop", "hour", "month", "distance_cardholder_merchant",
+    "age", "is_weekend", "is_night",
+    "velocity_1h", "velocity_24h", "amount_velocity_1h",
+    "category_encoded", "gender_encoded", "day_of_week_encoded"
+  ],
+  "input_features_11_without_velocity": [
+    "amt", "city_pop", "hour", "month", "distance_cardholder_merchant",
+    "age", "is_weekend", "is_night",
+    "category_encoded", "gender_encoded", "day_of_week_encoded"
+  ],
+
+  "baseline_includes_velocity_features": true,
+  "experiment_mapping_note": "Because the F1=0.4747 run already includes velocity features, Experiment 2 (LSTM_with_velocity) is effectively a reproducibility re-run of v2. Experiment 1 (LSTM_no_velocity) is the genuinely new run. This must be disclosed in the viva.",
+
+  "rf_input": {
+    "shape_explanation": "[n_samples, 1 + n_static_features]",
+    "composition": "1 LSTM sigmoid probability + static (current transaction) features",
+    "with_velocity": "[n, 15] — 1 prob + 14 feats",
+    "without_velocity": "[n, 12] — 1 prob + 11 feats"
+  },
+
+  "random_forest": {
+    "n_estimators": 200,
+    "max_depth": 12,
+    "class_weight": {"0": 1, "1": 150},
+    "random_state": 42,
+    "n_jobs": -1,
+    "smote": false
+  },
+
+  "preprocessing": {
+    "scaler": "StandardScaler",
+    "fit": "fit_transform on X_train[feature_cols] only (no leakage at this step)",
+    "transform_test": "transform using train-fitted scaler"
+  },
+
+  "evaluation": {
+    "threshold": 0.5,
+    "threshold_secondary": 0.7,
+    "test_set": "fraudTest_engineered.csv (555,719 rows, 2,145 fraud)",
+    "train_set": "fraudTrain_engineered.csv (1,296,675 rows, 7,506 fraud)"
+  },
+
+  "random_seeds": {
+    "rf_random_state": 42,
+    "smote_random_state": 42,
+    "tensorflow_seed": "NOT SET IN ORIGINAL — must set to 42 for reruns",
+    "numpy_seed": "NOT SET IN ORIGINAL — must set to 42 for reruns",
+    "python_random_seed": "NOT SET IN ORIGINAL — must set to 42 for reruns"
+  },
+
+  "red_flags": [
+    "CRITICAL BLOCKER: LSTM is Keras/TensorFlow, not PyTorch. The torch+cu121 venv plan will not help LSTM runs. Windows native TensorFlow GPU support ended at TF 2.10; WSL2 or tensorflow-directml are the viable GPU paths. Simplest fallback: run LSTM on CPU (Keras works fine on CPU in Python 3.14).",
+    "LSTM is non-deterministic (no TF/numpy/python seed set in original). Exact F1=0.4747 is not bit-reproducible; expect ±0.01-0.03 drift even with correct seeds.",
+    "Keras validation_split takes the tail 10% of the already-cc_num-sorted training array — validation set is skewed toward the highest cc_num cards. Poor protocol but not a data leak.",
+    "Velocity features (velocity_1h, velocity_24h, amount_velocity_1h) are consumed from engineered CSVs produced by EDA_FYP_FINAL.ipynb. If those were computed on train+test combined, there is upstream leakage. Hybrid notebook itself does not recompute them. WORTH VERIFYING before publishing results.",
+    "Sequence padding with zeros on scaled data (post StandardScaler) — padded rows look like 'mean' transactions. Minor concern.",
+    "cc_num positional re-attachment from original CSVs to engineered CSVs assumes row order is preserved. If EDA notebook reordered rows, cc_num aligns to wrong feature vectors silently. WORTH VERIFYING.",
+    "Colab Drive paths hardcoded in cells 0-4 (`/content/drive/MyDrive/FYP_Fraud_Detection/`). Must be rewritten for local execution.",
+    "RF uses class_weight={0:1, 1:150} while LSTM uses {0:1, 1:171.8}. Inconsistency — likely hand-tuned for RF. Reproduce as-is."
+  ],
+
+  "blockers_to_deterministic_rerun": [
+    "No TF/numpy/python seed → set all before rerun",
+    "Colab paths → rewrite to local (same folder as notebook)",
+    "TF op-level nondeterminism on GPU → set TF_DETERMINISTIC_OPS=1 (irrelevant if running on CPU)",
+    "Upstream engineered CSV row alignment → verify or recompute velocity features from scratch"
+  ]
+}

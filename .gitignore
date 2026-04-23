@@ -2,6 +2,10 @@
 fraudTrain.csv
 fraudTest.csv
 
+# Regenerable engineered CSVs with row IDs (produced by fix_lstm_alignment.py)
+fraudTrain_engineered_with_ids.csv
+fraudTest_engineered_with_ids.csv
+
 # Python
 __pycache__/
 *.pyc
@@ -17,6 +21,9 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Claude Code harness state (local only)
+.claude/
 
 # Env
 .env

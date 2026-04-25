@@ -1,10 +1,6 @@
-# Oversized raw dataset (GitHub 100MB limit)
-fraudTrain.csv
-fraudTest.csv
-
-# Regenerable engineered CSVs with row IDs (produced by fix_lstm_alignment.py)
-fraudTrain_engineered_with_ids.csv
-fraudTest_engineered_with_ids.csv
+# Datasets (raw + engineered) — too large for GitHub, regenerable
+data/raw/
+data/engineered/
 
 # Python
 __pycache__/

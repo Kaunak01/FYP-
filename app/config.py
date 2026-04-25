@@ -8,7 +8,7 @@ MODELS_DIR = os.path.join(BASE_DIR, 'models', 'saved')
 STATS_DIR = os.path.join(BASE_DIR, 'models', 'stats')
 DB_PATH = os.path.join(BASE_DIR, 'app', 'fraud_detection.db')
 LOG_PATH = os.path.join(BASE_DIR, 'app', 'logs', 'fraud_detection.log')
-DATA_DIR = BASE_DIR  # CSVs are in project root
+DATA_DIR = os.path.join(BASE_DIR, 'data', 'engineered')  # engineered CSVs
 SIM_DATA_DIR = os.path.join(BASE_DIR, 'data')  # simulation datasets
 
 # ---- Model files ----

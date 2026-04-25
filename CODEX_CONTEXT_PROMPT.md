@@ -66,8 +66,10 @@ lat/long replaced by distance_cardholder_merchant using Haversine formula.
 ### 2. FYP_Hybrid_Model.ipynb — Hybrid 1: LSTM + Random Forest
 - LSTM architecture: 64 units, Dropout(0.3), trained 5 epochs on sequential data
 - LSTM output probabilities concatenated with original 14 features → fed to RF
-- Results: F1=0.47 (v2 config), SMOTE made it worse (F1=0.28)
-- Underperformed due to class imbalance and LSTM not learning fraud sequences well
+- **Corrected pipeline uses `fraudTrain_engineered_with_ids.csv` / `fraudTest_engineered_with_ids.csv`** (composite-key one-to-one merge — see `AUDIT_WIN_NARRATIVE.md`)
+- **Corrected F1 = 0.7892** (see `verified_metrics.json["gap_experiments"]["LSTM_reproduced_baseline"]`)
+- Historical broken F1 = 0.4747 came from positional `.values` attach of cc_num; preserved only in `FYP_Hybrid_Model_BROKEN.ipynb` for audit, do not cite as current result
+- SMOTE on merged features still degraded F1 in the corrected pipeline (consistent with original finding)
 
 ### 3. FYP_Autoencoder_XGBoost.ipynb — Hybrid 2: Autoencoder + XGBoost
 - **Autoencoder architecture (PyTorch):** 14→10→5→10→14
@@ -79,10 +81,10 @@ lat/long replaced by distance_cardholder_merchant using Haversine formula.
 - Three configs tested:
   - Class weights only → F1=0.52
   - SMOTE → F1=0.84
-  - SMOTE + hyperparameter tuning → **F1=0.87 (best)**
-- Ablation study:
+  - SMOTE + hyperparameter tuning → **F1=0.8690 (verified)**
+- Ablation study (current implementation — input-layer only; see `run_audit_retrains.py` for true from-scratch ablation, pending rerun):
   - WITH velocity features: F1=0.8705
-  - WITHOUT velocity features: F1=0.8561
+  - WITHOUT velocity features (input removed, AE recon_error still trained with velocity): F1=0.8561
   - Contribution of velocity features: **+0.0144 F1**
 - SHAP analysis top 5 features (by mean |SHAP|):
   1. is_night (2.86)
@@ -96,6 +98,7 @@ lat/long replaced by distance_cardholder_merchant using Haversine formula.
   - Missed frauds have lower recon error (0.66 vs 1.79 for caught)
 
 ### 4. FYP_BDS_GA.ipynb — BDS Algorithm + Genetic Algorithm Optimisation
+- **BDS scope (post-audit clarification):** profiles are built from the **training partition only** — test transactions never contribute to any cardholder's profile statistic. This is leakage-safe for batch evaluation. A **streaming past-only** variant (per-transaction expanding history with `shift(1)`) is NOT implemented and is noted as future work in the dissertation.
 - **BDS (Behavioural Deviation Scoring):** 4 per-cardholder deviation scores:
   1. Amount deviation: how much this transaction deviates from cardholder's mean spend
   2. Time deviation: how unusual the transaction hour is for this cardholder
@@ -109,7 +112,7 @@ lat/long replaced by distance_cardholder_merchant using Haversine formula.
 - Results:
   - AE+BDS(GA)+XGBoost class weights → F1=0.53
   - AE+BDS(GA)+XGBoost SMOTE → F1=0.83
-  - AE+BDS(GA)+XGBoost SMOTE+tuned → **F1=0.868**
+  - AE+BDS(GA)+XGBoost SMOTE+tuned → **F1=0.8706 (verified, best saved model)**
 - Full SHAP analysis on 19-feature model
 
 ---
@@ -118,15 +121,22 @@ lat/long replaced by distance_cardholder_merchant using Haversine formula.
 
 | Model | F1 |
 |---|---|
-| LSTM + RF (Hybrid 1) | 0.47 |
+| LSTM + RF (Hybrid 1, corrected pipeline) | **0.7892** |
+| LSTM + RF (broken historical — not for citation) | 0.4747 |
+| XGBoost Only (class weights) | 0.5215 |
+| XGBoost Only (SMOTE + tuned) | 0.8646 |
 | AE + XGBoost (class weights) | 0.52 |
 | AE + XGBoost (SMOTE) | 0.84 |
-| AE + XGBoost (SMOTE + tuned) | **0.87** ← best |
+| AE + XGBoost (SMOTE + tuned) | **0.8690** |
 | AE + BDS(GA) + XGBoost (class weights) | 0.53 |
 | AE + BDS(GA) + XGBoost (SMOTE) | 0.83 |
-| AE + BDS(GA) + XGBoost (SMOTE + tuned) | **0.868** |
+| AE + BDS(GA) + XGBoost (SMOTE + tuned) | **0.8706 ← best saved model** |
 
-Best overall: **AE + XGBoost SMOTE+tuned, F1 = 0.87**
+Best overall: **AE + BDS(GA) + XGBoost SMOTE+tuned, F1 = 0.8706** (fractionally above AE+XGBoost 0.8690; 19 features vs 15).
+
+### Pending audit reruns (not yet overwriting headline metrics)
+- **True from-scratch no-velocity ablation** — fresh AE retrained without velocity. Runner: `python run_audit_retrains.py --true-no-velocity`. Appends to `verified_metrics.json["audit_reruns"]`.
+- **SMOTE-inside-CV tuning (imblearn Pipeline)** for AE+XGB and AE+BDS+XGB. Runner: `python run_audit_retrains.py --pipeline-cv-ae --pipeline-cv-bds`.
 
 ---
 

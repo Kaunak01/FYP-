@@ -9,16 +9,27 @@
 <div class="row g-3">
     <div class="col-md-6">
         <div class="card p-4">
-            <h6>Active Model</h6>
-            {% for m in model_info.available_models %}
-            <div class="form-check mb-2">
-                <input class="form-check-input" type="radio" name="model" value="{{ m }}"
-                    {{ 'checked' if m == model_info.active_model }} onchange="switchModel('{{ m }}')">
-                <label class="form-check-label">
-                    <strong>{{ m }}</strong>
-                    <br><small class="text-muted">{{ '14 features' if 'XGBoost' in m and 'AE' not in m else '15 features' if 'AE+XGBoost' == m else '19 features' }}</small>
-                </label>
-            </div>
+            <h6>Active Model — Staged 3-Model Study</h6>
+            <small class="text-muted d-block mb-3">All 4 models stay loaded; AE + BDS + XGBoost is the default Proposed Model.</small>
+            {% for cat_key in ['baseline', 'proposed', 'proposed_component', 'supplementary'] %}
+                {% set cat_label = MODEL_CATEGORY_LABELS.get(cat_key, cat_key) %}
+                {% set group = model_info.available_models | reject('equalto', None) | list %}
+                {% set in_cat = [] %}
+                {% for m in model_info.available_models if MODEL_CATEGORIES.get(m) == cat_key %}
+                    {% if loop.first %}
+                        <div class="mb-2 mt-2" style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:{{ '#1f6feb' if cat_key == 'proposed' else '#6c757d' }};">{{ cat_label }}</div>
+                    {% endif %}
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="model" value="{{ m }}"
+                            {{ 'checked' if m == model_info.active_model }} onchange="switchModel('{{ m }}')">
+                        <label class="form-check-label">
+                            <strong>{{ m }}</strong>
+                            {% if cat_key == 'proposed' %}<span class="badge ms-1" style="background:#1f6feb;font-size:0.6rem;">Default</span>{% endif %}
+                            <br><small class="text-muted">{{ MODEL_DESCRIPTIONS.get(m, '') }}</small>
+                            <br><small class="text-muted">{{ '14 features' if 'XGBoost' in m and 'AE' not in m else '15 features' if 'AE+XGBoost' == m else '19 features' }}</small>
+                        </label>
+                    </div>
+                {% endfor %}
             {% endfor %}
         </div>
     </div>

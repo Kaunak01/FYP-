@@ -47,6 +47,24 @@ def create_app():
     postprocessor = Postprocessor()
     drift_detector = DriftDetector()
 
+    # Make 3-Model Staged Study constants available to all templates
+    from app.config import (
+        MODEL_CATEGORIES, MODEL_CATEGORY_LABELS, MODEL_DESCRIPTIONS,
+        MODEL_F1_LABELS, MODEL_INTERNAL_TO_DISPLAY,
+        STAGED_STUDY_TABLE_A, STAGED_STUDY_TABLE_B,
+    )
+    @app.context_processor
+    def inject_staged_study_constants():
+        return {
+            'MODEL_CATEGORIES': MODEL_CATEGORIES,
+            'MODEL_CATEGORY_LABELS': MODEL_CATEGORY_LABELS,
+            'MODEL_DESCRIPTIONS': MODEL_DESCRIPTIONS,
+            'MODEL_F1_LABELS': MODEL_F1_LABELS,
+            'MODEL_INTERNAL_TO_DISPLAY': MODEL_INTERNAL_TO_DISPLAY,
+            'STAGED_STUDY_TABLE_A': STAGED_STUDY_TABLE_A,
+            'STAGED_STUDY_TABLE_B': STAGED_STUDY_TABLE_B,
+        }
+
     # Register routes
     init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift_detector, db)
     init_simulation(app, model_manager, preprocessor, rule_engine, postprocessor, db)

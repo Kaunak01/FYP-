@@ -75,13 +75,53 @@ MODEL_INTERNAL_TO_DISPLAY = {
     'AE+XGBoost':              'Autoencoder + XGBoost',
     'AE+BDS+XGBoost':          'AE + BDS + XGBoost',
 }
-# display name → F1 score label
+# display name → F1 score label (4-decimal precision, per verified_metrics.json @ threshold=0.5)
 MODEL_F1_LABELS = {
-    'xgboost_baseline': 'F1: 0.52',
-    'xgboost_smote':    'F1: 0.87',
-    'ae_xgboost':       'F1: 0.87',
-    'ae_bds_xgboost':   'F1: 0.87',
+    'xgboost_baseline': 'F1: 0.5215',
+    'xgboost_smote':    'F1: 0.8646',
+    'ae_xgboost':       'F1: 0.8690',
+    'ae_bds_xgboost':   'F1: 0.8706',
 }
+
+# ---- 3-Model Staged Study framing ----
+# Category each .joblib model belongs to in the dissertation framing.
+# 'comparator' (LSTM + RF) is reported as a comparison row only — not a runtime .joblib.
+MODEL_CATEGORIES = {
+    'XGBoost (Class Weights)': 'supplementary',
+    'XGBoost (SMOTE+Tuned)':   'baseline',
+    'AE+XGBoost':              'proposed_component',
+    'AE+BDS+XGBoost':          'proposed',
+}
+
+MODEL_CATEGORY_LABELS = {
+    'baseline':           'Baseline',
+    'comparator':         'Hybrid Comparator',
+    'proposed_component': 'Proposed Model — Component',
+    'proposed':           'Proposed Model',
+    'supplementary':      'Supplementary',
+}
+
+MODEL_DESCRIPTIONS = {
+    'XGBoost (Class Weights)': 'Supplementary baseline variant — class-weighted, no SMOTE',
+    'XGBoost (SMOTE+Tuned)':   'Strong tabular baseline using gradient boosting',
+    'AE+XGBoost':              'Proposed Model component (without BDS) — adds anomaly signal',
+    'AE+BDS+XGBoost':          'Proposed Model — anomaly + behavioural hybrid (default)',
+}
+
+# Headline 3-Model Staged Study metrics — sourced from results/verified_metrics.json @ threshold=0.5.
+# Used for Table A (main comparison) and Table B (Proposed Model component analysis) on the
+# Model Performance page. LSTM PR-AUC is "n/a (not recorded)" in verified_metrics.json.
+STAGED_STUDY_TABLE_A = [
+    {'category': 'Baseline',           'model': 'XGBoost (SMOTE+tuned)',      'f1': 0.8646, 'precision': 0.9297, 'recall': 0.8079, 'roc_auc': 0.9972, 'pr_auc': 0.9092},
+    {'category': 'Hybrid Comparator',  'model': 'LSTM + Random Forest',       'f1': 0.7892, 'precision': 0.6770, 'recall': 0.9459, 'roc_auc': 0.9981, 'pr_auc': None},
+    {'category': 'Proposed Model',     'model': 'AE + BDS(GA) + XGBoost',     'f1': 0.8706, 'precision': 0.9338, 'recall': 0.8154, 'roc_auc': 0.9976, 'pr_auc': 0.9158},
+]
+
+STAGED_STUDY_TABLE_B = [
+    {'variant': 'XGBoost only',           'tests': 'Without anomaly/BDS',     'f1': 0.8646, 'precision': 0.9297, 'recall': 0.8079, 'roc_auc': 0.9972, 'pr_auc': 0.9092},
+    {'variant': 'AE + XGBoost',           'tests': 'Adds autoencoder',        'f1': 0.8690, 'precision': 0.9369, 'recall': 0.8103, 'roc_auc': 0.9973, 'pr_auc': 0.9142},
+    {'variant': 'AE + BDS(GA) + XGBoost', 'tests': 'Adds behavioural scores', 'f1': 0.8706, 'precision': 0.9338, 'recall': 0.8154, 'roc_auc': 0.9976, 'pr_auc': 0.9158},
+]
 
 # ---- Simulation datasets ----
 import os as _os

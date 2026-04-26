@@ -15,11 +15,17 @@
             <div class="card p-3">
                 <div class="d-flex align-items-center gap-3 flex-wrap">
                     <label class="text-muted mb-0" style="white-space:nowrap;font-size:0.85rem;">Select Model</label>
-                    <select id="model-select" class="form-select form-select-sm" style="max-width:320px;" onchange="switchModel(this.value)">
-                        <option value="xgboost_baseline">XGBoost Baseline (F1: 0.52)</option>
-                        <option value="xgboost_smote">XGBoost + SMOTE (F1: 0.87)</option>
-                        <option value="ae_xgboost">Autoencoder + XGBoost (F1: 0.87)</option>
-                        <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.87) ★ Best</option>
+                    <select id="model-select" class="form-select form-select-sm" style="max-width:380px;" onchange="switchModel(this.value)">
+                        <optgroup label="Baseline">
+                            <option value="xgboost_smote">XGBoost (SMOTE+Tuned) (F1: 0.8646)</option>
+                        </optgroup>
+                        <optgroup label="Proposed Model">
+                            <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.8706) ★ Default</option>
+                            <option value="ae_xgboost">AE + XGBoost — Component (F1: 0.8690)</option>
+                        </optgroup>
+                        <optgroup label="Supplementary">
+                            <option value="xgboost_baseline">XGBoost (Class Weights) — Supplementary (F1: 0.5215)</option>
+                        </optgroup>
                     </select>
                     <span id="model-switch-status" class="text-muted" style="font-size:0.8rem;"></span>
                 </div>
@@ -554,7 +560,7 @@ function buildPerformanceTab(perf) {
     // Baseline comparison
     document.getElementById('baseline-comparison').innerHTML =
         '<table class="table table-sm" style="font-size:0.82rem;">' +
-        '<tr><th>Metric</th><th>This Dataset</th><th>Baseline</th></tr>' +
+        '<tr><th>Metric</th><th>This Dataset</th><th>Baseline (XGBoost SMOTE+tuned)</th></tr>' +
         '<tr><td>F1</td><td><strong>'+perf.f1+'</strong></td><td>0.8646</td></tr>' +
         '<tr><td>Precision</td><td><strong>'+perf.precision+'</strong></td><td>0.9297</td></tr>' +
         '<tr><td>Recall</td><td><strong>'+perf.recall+'</strong></td><td>0.8079</td></tr>' +

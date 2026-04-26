@@ -115,11 +115,17 @@
     <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
         <div class="d-flex align-items-center gap-2">
             <label class="text-muted mb-0" style="white-space:nowrap;font-size:0.82rem;">Model:</label>
-            <select id="model-select" class="form-select form-select-sm" style="min-width:240px;" onchange="switchModel(this.value)">
-                <option value="xgboost_baseline">XGBoost Baseline (F1: 0.52)</option>
-                <option value="xgboost_smote">XGBoost + SMOTE (F1: 0.87)</option>
-                <option value="ae_xgboost">Autoencoder + XGBoost (F1: 0.87)</option>
-                <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.87) ★ Best</option>
+            <select id="model-select" class="form-select form-select-sm" style="min-width:300px;" onchange="switchModel(this.value)">
+                <optgroup label="Baseline">
+                    <option value="xgboost_smote">XGBoost (SMOTE+Tuned) (F1: 0.8646)</option>
+                </optgroup>
+                <optgroup label="Proposed Model">
+                    <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.8706) ★ Default</option>
+                    <option value="ae_xgboost">AE + XGBoost — Component (F1: 0.8690)</option>
+                </optgroup>
+                <optgroup label="Supplementary">
+                    <option value="xgboost_baseline">XGBoost (Class Weights) (F1: 0.5215)</option>
+                </optgroup>
             </select>
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -195,10 +201,10 @@
             <thead>
                 <tr>
                     <th>Metric</th>
-                    <th>XGBoost Base <small class="text-muted">F1:0.52</small></th>
-                    <th>XGBoost+SMOTE <small class="text-muted">F1:0.87</small></th>
-                    <th>AE+XGBoost <small class="text-muted">F1:0.87</small></th>
-                    <th class="highlight">AE+BDS+XGBoost ★ <small>F1:0.87</small></th>
+                    <th>XGBoost Base <small class="text-muted d-block">Supplementary · F1:0.5215</small></th>
+                    <th>XGBoost+SMOTE <small class="text-muted d-block">Baseline · F1:0.8646</small></th>
+                    <th>AE+XGBoost <small class="text-muted d-block">Proposed Component · F1:0.8690</small></th>
+                    <th class="highlight">AE+BDS+XGBoost ★ <small class="d-block">Proposed Model · F1:0.8706</small></th>
                 </tr>
             </thead>
             <tbody id="compare-stats-body">

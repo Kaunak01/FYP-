@@ -86,9 +86,15 @@
                 <tr><td class="text-muted">Drift Status</td><td class="text-end"><span class="badge" style="background:#2ecc71;">GREEN</span></td></tr>
             </table>
             <div class="mt-2">
-                <small class="text-muted">Models available: {{ model_info.available_models|length }}</small><br>
-                {% for m in model_info.available_models %}
-                <span class="badge bg-secondary me-1" style="font-size:0.65rem;">{{ m }}</span>
+                <small class="text-muted">Staged 3-Model Study ({{ model_info.available_models|length }} runtime models loaded):</small>
+                {% for cat_key, cat_label in [('baseline','Baseline'),('proposed','Proposed Model'),('proposed_component','Proposed Component'),('supplementary','Supplementary')] %}
+                    {% set cat_models = model_info.available_models | selectattr('0', 'defined') | list %}
+                    {% set _ = [] %}
+                    {% for m in model_info.available_models if MODEL_CATEGORIES.get(m) == cat_key %}
+                        {% if loop.first %}<div class="mt-1"><small class="text-muted" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;">{{ cat_label }}</small><br>{% endif %}
+                        <span class="badge me-1" style="font-size:0.65rem;background:{{ '#1f6feb' if cat_key == 'proposed' else '#6c757d' }};">{{ m }}</span>
+                        {% if loop.last %}</div>{% endif %}
+                    {% endfor %}
                 {% endfor %}
             </div>
         </div>

@@ -1,21 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Model Performance — Fraud Detection System{% endblock %}
 {% block content %}
-<h4 class="mb-4">Model Performance & Drift Monitoring</h4>
+<h4 class="mb-1">Model Performance — Staged 3-Model Study</h4>
+<small class="text-muted d-block mb-4">Baseline · Hybrid Comparator · Proposed Model. Metrics @ threshold = 0.5, sourced from <code>results/verified_metrics.json</code>.</small>
 
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card p-3">
             <h6>Active Model</h6>
             <div class="fs-5 fw-bold">{{ model_info.active_model }}</div>
-            <small class="text-muted">{{ model_info.feature_count }} features</small>
+            <small class="text-muted">{{ MODEL_CATEGORY_LABELS.get(MODEL_CATEGORIES.get(model_info.active_model, ''), '') }} · {{ model_info.feature_count }} features</small>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card p-3">
-            <h6>Baseline F1</h6>
-            <div class="fs-5 fw-bold">0.8646</div>
-            <small class="text-muted">Test set performance</small>
+            <h6>Proposed Model F1</h6>
+            <div class="fs-5 fw-bold">0.8706</div>
+            <small class="text-muted">AE + BDS(GA) + XGBoost</small>
         </div>
     </div>
     <div class="col-md-3">
@@ -27,31 +28,105 @@
     </div>
     <div class="col-md-3">
         <div class="card p-3">
-            <h6>Available Models</h6>
-            {% for m in model_info.available_models %}
-            <div>
-                <span class="badge {{ 'bg-danger' if m == model_info.active_model else 'bg-secondary' }}">{{ m }}</span>
-                {% if m != model_info.active_model %}
-                <button class="btn btn-sm btn-link p-0" onclick="switchModel('{{ m }}')">Switch</button>
-                {% endif %}
-            </div>
+            <h6>Available Models (4)</h6>
+            {% for cat_key in ['baseline', 'proposed', 'proposed_component', 'supplementary'] %}
+                {% for m in model_info.available_models if MODEL_CATEGORIES.get(m) == cat_key %}
+                    {% if loop.first %}<div style="font-size:0.6rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:{{ '#1f6feb' if cat_key == 'proposed' else '#6c757d' }};margin-top:4px;">{{ MODEL_CATEGORY_LABELS.get(cat_key) }}</div>{% endif %}
+                    <div style="margin:2px 0;">
+                        <span class="badge {{ 'bg-danger' if m == model_info.active_model else 'bg-secondary' }}" style="font-size:0.65rem;">{{ m }}</span>
+                        {% if m != model_info.active_model %}
+                        <button class="btn btn-sm btn-link p-0" style="font-size:0.7rem;" onclick="switchModel('{{ m }}')">Switch</button>
+                        {% endif %}
+                    </div>
+                {% endfor %}
             {% endfor %}
         </div>
     </div>
 </div>
 
+<!-- Table A: Main 3-Model Comparison -->
 <div class="card p-3 mb-3">
-    <h6>Baseline Metrics (Test Set)</h6>
-    <table class="table table-sm">
-        <tr><th>Metric</th><th>Value</th><th>Interpretation</th></tr>
-        <tr><td>F1 Score</td><td>0.8646</td><td>Harmonic mean of precision and recall</td></tr>
-        <tr><td>Precision</td><td>0.9297</td><td>93% of flagged transactions are actually fraud</td></tr>
-        <tr><td>Recall</td><td>0.8079</td><td>81% of all frauds are detected</td></tr>
-        <tr><td>ROC-AUC</td><td>0.9972</td><td>Near-perfect ranking ability</td></tr>
-        <tr><td>Throughput</td><td>826K txns/sec</td><td>Well within banking latency requirements</td></tr>
+    <h6 class="mb-2">Table A — Main Model Comparison</h6>
+    <small class="text-muted d-block mb-2">Three deliberately chosen models: tabular baseline, sequence comparator, behavioural-explainable hybrid.</small>
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Category</th>
+                <th>Model</th>
+                <th class="text-end">F1</th>
+                <th class="text-end">Precision</th>
+                <th class="text-end">Recall</th>
+                <th class="text-end">ROC-AUC</th>
+                <th class="text-end">PR-AUC</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in STAGED_STUDY_TABLE_A %}
+            <tr {% if row.category == 'Proposed Model' %}style="background:rgba(31,111,235,0.08);font-weight:600;"{% endif %}>
+                <td>
+                    <span class="badge" style="background:{{ '#1f6feb' if row.category == 'Proposed Model' else '#6c757d' }};font-size:0.7rem;">{{ row.category }}</span>
+                </td>
+                <td>{{ row.model }}{% if row.category == 'Proposed Model' %} ★{% endif %}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.f1) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.precision) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.recall) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.roc_auc) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{% if row.pr_auc is none %}<span class="text-muted">n/a (not recorded)</span>{% else %}{{ '%.4f'|format(row.pr_auc) }}{% endif %}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <small class="text-muted">LSTM + RF reflects the post row-alignment fix (verified_metrics.json → <code>LSTM_reproduced_baseline</code>); historical 0.4747 figure is audit-preserved in <code>notebooks/archive/FYP_Hybrid_Model_BROKEN.ipynb</code> and is not for citation.</small>
+</div>
+
+<!-- Table B: Proposed Model Component Analysis -->
+<div class="card p-3 mb-3">
+    <h6 class="mb-2">Table B — Proposed Model Component Analysis</h6>
+    <small class="text-muted d-block mb-2">Internal ablation showing the marginal lift from each component of the Proposed Model.</small>
+    <table class="table table-sm align-middle">
+        <thead>
+            <tr>
+                <th>Variant</th>
+                <th>What It Tests</th>
+                <th class="text-end">F1</th>
+                <th class="text-end">Precision</th>
+                <th class="text-end">Recall</th>
+                <th class="text-end">ROC-AUC</th>
+                <th class="text-end">PR-AUC</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in STAGED_STUDY_TABLE_B %}
+            <tr {% if loop.last %}style="background:rgba(31,111,235,0.08);font-weight:600;"{% endif %}>
+                <td>{{ row.variant }}{% if loop.last %} ★{% endif %}</td>
+                <td><small class="text-muted">{{ row.tests }}</small></td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.f1) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.precision) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.recall) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.roc_auc) }}</td>
+                <td class="text-end" style="font-family:var(--mono);">{{ '%.4f'|format(row.pr_auc) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
     </table>
 </div>
 
+<!-- Supplementary configurations note -->
+<div class="card p-3 mb-3">
+    <h6 class="mb-2">Supplementary Configurations</h6>
+    <small class="text-muted">Additional XGBoost variant retained as a baseline configuration check; not a main study model.</small>
+    <table class="table table-sm mt-2">
+        <tr><th>Model</th><th class="text-end">F1</th><th class="text-end">ROC-AUC</th><th>Note</th></tr>
+        <tr>
+            <td>XGBoost (Class Weights)</td>
+            <td class="text-end" style="font-family:var(--mono);">0.5215</td>
+            <td class="text-end" style="font-family:var(--mono);">0.9978</td>
+            <td><small class="text-muted">Class-weighted only, no SMOTE — kept loaded in switcher for completeness</small></td>
+        </tr>
+    </table>
+</div>
+
+<!-- Drift monitoring -->
 <div class="card p-3">
     <h6>Drift Monitoring</h6>
     <p class="text-muted">The system uses Population Stability Index (PSI) to detect data drift.

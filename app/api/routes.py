@@ -4,7 +4,12 @@ import logging
 from functools import wraps
 from collections import defaultdict
 from flask import Blueprint, request, jsonify
-from app.config import DEFAULT_THRESHOLD, RISK_LEVELS, MODEL_CODE_TO_INTERNAL, MODEL_INTERNAL_TO_DISPLAY, SIMULATION_DATASETS, FEATURE_DISPLAY_NAMES, FEATURE_COLS
+from app.config import (
+    DEFAULT_THRESHOLD, RISK_LEVELS,
+    MODEL_CODE_TO_INTERNAL, MODEL_INTERNAL_TO_DISPLAY,
+    MODEL_CATEGORIES, MODEL_CATEGORY_LABELS, MODEL_DESCRIPTIONS,
+    SIMULATION_DATASETS, FEATURE_DISPLAY_NAMES, FEATURE_COLS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -252,8 +257,15 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
         for code, internal in MODEL_CODE_TO_INTERNAL.items():
             display = MODEL_INTERNAL_TO_DISPLAY.get(internal, internal)
             available = internal in model_manager.models
-            models.append({'code': code, 'internal': internal, 'display': display, 'available': available,
-                           'active': internal == model_manager.active_model_name})
+            category = MODEL_CATEGORIES.get(internal, 'supplementary')
+            models.append({
+                'code': code, 'internal': internal, 'display': display,
+                'available': available,
+                'active': internal == model_manager.active_model_name,
+                'category': category,
+                'category_label': MODEL_CATEGORY_LABELS.get(category, category),
+                'description': MODEL_DESCRIPTIONS.get(internal, ''),
+            })
         datasets = []
         for key, info in SIMULATION_DATASETS.items():
             exists = info['file'] is None or os.path.exists(info['file'])

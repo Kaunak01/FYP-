@@ -12,15 +12,17 @@ DATA_DIR = os.path.join(BASE_DIR, 'data', 'engineered')  # engineered CSVs
 SIM_DATA_DIR = os.path.join(BASE_DIR, 'data')  # simulation datasets
 
 # ---- Model files ----
+# Layout: models/saved/{01_baseline,02_comparator,03_proposed,supplementary}/
+# Each main-model folder is self-contained for the marker.
 MODEL_FILES = {
-    'xgb_cw': os.path.join(MODELS_DIR, 'xgboost_baseline_cw.joblib'),
-    'xgb_tuned': os.path.join(MODELS_DIR, 'xgboost_smote_tuned.joblib'),
-    'ae_model': os.path.join(MODELS_DIR, 'ae_model.pt'),
-    'ae_scaler': os.path.join(MODELS_DIR, 'ae_scaler.joblib'),
-    'ae_xgb': os.path.join(MODELS_DIR, 'ae_xgboost_smote_tuned.joblib'),
-    'bds_profiles': os.path.join(MODELS_DIR, 'bds_profiles.joblib'),
-    'ga_params': os.path.join(MODELS_DIR, 'ga_best_params.json'),
-    'bds_xgb': os.path.join(MODELS_DIR, 'ae_bds_xgboost_smote_tuned.joblib'),
+    'xgb_cw':       os.path.join(MODELS_DIR, 'supplementary', 'xgboost_baseline_cw.joblib'),
+    'xgb_tuned':    os.path.join(MODELS_DIR, '01_baseline',   'xgboost_smote_tuned.joblib'),
+    'ae_model':     os.path.join(MODELS_DIR, '03_proposed',   'ae_model.pt'),
+    'ae_scaler':    os.path.join(MODELS_DIR, '03_proposed',   'ae_scaler.joblib'),
+    'ae_xgb':       os.path.join(MODELS_DIR, '03_proposed',   'ae_xgboost_smote_tuned.joblib'),
+    'bds_profiles': os.path.join(MODELS_DIR, '03_proposed',   'bds_profiles.joblib'),
+    'ga_params':    os.path.join(MODELS_DIR, '03_proposed',   'ga_best_params.json'),
+    'bds_xgb':      os.path.join(MODELS_DIR, '03_proposed',   'ae_bds_xgboost_smote_tuned.joblib'),
 }
 
 STATS_FILES = {

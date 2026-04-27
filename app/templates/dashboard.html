@@ -76,7 +76,7 @@
             <h6 class="mb-3" style="font-weight:700;font-size:0.85rem;">Model Health</h6>
             <div class="d-flex align-items-center gap-2 mb-3">
                 <span class="status-dot-live"></span>
-                <span style="font-size:0.85rem;font-weight:600;">{{ model_info.active_model }}</span>
+                <span style="font-size:0.85rem;font-weight:600;">{{ MODEL_INTERNAL_TO_DISPLAY.get(model_info.active_model, model_info.active_model) }}</span>
             </div>
             <table class="table table-sm" style="font-size:0.8rem;">
                 <tr><td class="text-muted">Baseline F1</td><td class="text-end"><strong style="font-family:var(--mono);">0.8646</strong></td></tr>
@@ -86,41 +86,16 @@
                 <tr><td class="text-muted">Drift Status</td><td class="text-end"><span class="badge" style="background:#2ecc71;">GREEN</span></td></tr>
             </table>
             <div class="mt-2">
-                <small class="text-muted">Staged 3-Model Study ({{ model_info.available_models|length }} runtime models loaded):</small>
-                {% for cat_key, cat_label in [('baseline','Baseline'),('proposed','Proposed Model'),('proposed_component','Proposed Component'),('supplementary','Supplementary')] %}
-                    {% set cat_models = model_info.available_models | selectattr('0', 'defined') | list %}
-                    {% set _ = [] %}
+                <small class="text-muted">Staged 3-Model Study:</small>
+                {% for cat_key, cat_label in [('baseline','Baseline'),('comparator','Comparator'),('proposed','Proposed')] %}
                     {% for m in model_info.available_models if MODEL_CATEGORIES.get(m) == cat_key %}
                         {% if loop.first %}<div class="mt-1"><small class="text-muted" style="font-size:0.65rem;text-transform:uppercase;letter-spacing:0.05em;">{{ cat_label }}</small><br>{% endif %}
-                        <span class="badge me-1" style="font-size:0.65rem;background:{{ '#1f6feb' if cat_key == 'proposed' else '#6c757d' }};">{{ m }}</span>
+                        <span class="badge me-1" style="font-size:0.65rem;background:{{ '#1f6feb' if cat_key == 'proposed' else '#6c757d' }};">{{ MODEL_INTERNAL_TO_DISPLAY.get(m, m) }}</span>
                         {% if loop.last %}</div>{% endif %}
                     {% endfor %}
                 {% endfor %}
             </div>
         </div>
-    </div>
-</div>
-
-<!-- Recent Alerts -->
-<div class="card p-3 fade-in">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="mb-0" style="font-weight:700;font-size:0.85rem;">Recent Alerts</h6>
-        <a href="/alerts" class="btn btn-sm btn-outline-danger">View All</a>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>Time</th><th>Transaction</th><th>Amount</th><th>Category</th>
-                    <th>Probability</th><th>Risk</th><th>Decision</th><th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="alerts-body">
-                <tr><td colspan="8" class="text-center text-muted py-4">
-                    No alerts yet. <a href="/analyse">Analyse transactions</a> or <a href="/monitor">run live demo</a> to see alerts.
-                </td></tr>
-            </tbody>
-        </table>
     </div>
 </div>
 
@@ -174,32 +149,6 @@ function refreshStats() {
         document.getElementById('stat-risk').textContent = '$' + d.money_at_risk.toLocaleString('en-US', {maximumFractionDigits:0});
     }).catch(()=>{});
 
-    fetch('/api/alerts?limit=10').then(r => r.json()).then(d => {
-        const tbody = document.getElementById('alerts-body');
-        if (!d.alerts || d.alerts.length === 0) return;
-        tbody.innerHTML = '';
-        d.alerts.forEach(a => {
-            const prob = ((a.probability||0)*100).toFixed(1);
-            const probColor = a.probability >= 0.8 ? '#e74c3c' : a.probability >= 0.5 ? '#f39c12' : '#2ecc71';
-            const row = document.createElement('tr');
-            row.className = 'alert-row-' + (a.risk_level||'');
-            row.innerHTML = `
-                <td style="font-size:0.78rem;">${a.created_at || ''}</td>
-                <td><strong>${a.transaction_id || ''}</strong></td>
-                <td style="font-family:var(--mono);font-weight:600;">$${(a.amount||0).toFixed(2)}</td>
-                <td>${a.category || ''}</td>
-                <td>
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="prob-meter flex-grow-1" style="height:6px;"><div class="fill" style="width:${prob}%;background:${probColor};"></div></div>
-                        <span style="font-family:var(--mono);font-size:0.75rem;font-weight:600;color:${probColor};">${prob}%</span>
-                    </div>
-                </td>
-                <td><span class="badge badge-${a.risk_level}">${a.risk_level}</span></td>
-                <td><span class="badge badge-${a.classification}">${a.classification}</span></td>
-                <td><span class="badge bg-${a.status === 'confirmed' ? 'success' : a.status === 'pending' ? 'secondary' : 'warning'}" style="font-size:0.65rem;">${a.status}</span></td>`;
-            tbody.appendChild(row);
-        });
-    }).catch(()=>{});
 }
 
 setInterval(() => { refreshStats(); refreshHourChart(); }, 30000);

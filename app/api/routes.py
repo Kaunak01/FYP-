@@ -109,8 +109,13 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
 
             features, metadata = preprocessor.process(data, velocity_override=velocity_override)
 
+            # Build prior-feature sequence for LSTM+RF (no-op for other models)
+            prior = None
+            if model_manager.active_model_name == 'LSTM+RF' and metadata.get('card_number'):
+                prior = db.get_card_recent_features(metadata['card_number'], limit=4)
+
             # Predict (with SHAP for single transactions)
-            result = model_manager.predict_with_shap(features)
+            result = model_manager.predict_with_shap(features, prior_features=prior)
             probability = result['probability']
             risk_level = get_risk_level(probability)
 
@@ -235,7 +240,9 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
 
     @api_bp.route('/model/info', methods=['GET'])
     def model_info():
-        return jsonify(model_manager.get_model_info())
+        info = model_manager.get_model_info()
+        info['active_display'] = MODEL_INTERNAL_TO_DISPLAY.get(info.get('active_model'), info.get('active_model'))
+        return jsonify(info)
 
     @api_bp.route('/model/switch', methods=['POST'])
     def switch_model():
@@ -357,23 +364,6 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
             return jsonify({'error': f'No transactions found for card {card_id}'}), 404
         return jsonify(result)
 
-    @api_bp.route('/alerts', methods=['GET'])
-    def get_alerts():
-        status = request.args.get('status')
-        limit = int(request.args.get('limit', 100))
-        alerts = db.get_alerts(status=status, limit=limit)
-        return jsonify({'alerts': alerts, 'count': len(alerts)})
-
-    @api_bp.route('/alerts/<int:alert_id>', methods=['PUT'])
-    def update_alert(alert_id):
-        data = request.get_json()
-        status = data.get('status')
-        notes = data.get('analyst_notes')
-        if status not in ('confirmed', 'false_alarm', 'dismissed'):
-            return jsonify({'error': 'status must be confirmed, false_alarm, or dismissed'}), 400
-        db.update_alert_status(alert_id, status, notes)
-        return jsonify({'status': 'ok'})
-
     @api_bp.route('/stats', methods=['GET'])
     def stats():
         return jsonify(db.get_stats())
@@ -400,6 +390,11 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
         categories = []
         actuals = []
 
+        # Per-card running prior-feature buffers — used to build LSTM sequences
+        # within the batch when LSTM+RF is the active model.
+        lstm_active = (model_manager.active_model_name == 'LSTM+RF')
+        card_priors = {}
+
         for txn in transactions:
             try:
                 velocity_override = None
@@ -407,7 +402,19 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                     velocity_override = {k: txn[k] for k in ['velocity_1h', 'velocity_24h', 'amount_velocity_1h']}
 
                 features, metadata = preprocessor.process(txn, velocity_override=velocity_override)
-                pred = model_manager.predict(features)
+
+                prior = None
+                if lstm_active:
+                    card_id = metadata.get('card_number') or txn.get('cc_num') or '__nocard__'
+                    prior = card_priors.get(card_id, [])
+                    feat_for_seq = {c: float(features.get(c, 0.0)) for c in FEATURE_COLS}
+
+                pred = model_manager.predict(features, prior_features=prior) if lstm_active else model_manager.predict(features)
+                if lstm_active:
+                    buf = card_priors.setdefault(card_id, [])
+                    buf.append(feat_for_seq)
+                    if len(buf) > 4:
+                        buf.pop(0)
                 probability = pred['probability']
                 risk_level = get_risk_level(probability)
                 rule_result = rule_engine.evaluate(features)
@@ -539,73 +546,5 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
             'top_flagged': top_flagged,
             'results': results,
         })
-
-    # ---- Report generation ----
-    _report_store = {}  # report_id → bytes
-
-    @api_bp.route('/report/generate', methods=['POST'])
-    def generate_report():
-        from app.report_generator import FraudLensReportGenerator
-        data = request.get_json() or {}
-        config = {
-            'institution_name': data.get('institution_name', 'Financial Institution'),
-            'prepared_by': data.get('prepared_by', 'Fraud Analytics Team'),
-            'classification': data.get('classification', 'CONFIDENTIAL'),
-            'include_recommendations': data.get('include_recommendations', True),
-            'include_appendix': data.get('include_appendix', True),
-        }
-        payload = {k: data.get(k) for k in [
-            'total', 'counts', 'amount_at_risk', 'amount_safe',
-            'amount_stats', 'prob_distribution', 'hour_counts', 'hour_fraud',
-            'category_counts', 'category_fraud', 'performance',
-            'top_flagged', 'top_transactions', 'filename', 'model_display',
-        ]}
-        # Compute SHAP for top 10 high-risk transactions
-        top = payload.get('top_transactions') or payload.get('top_flagged') or []
-        for txn in top[:10]:
-            if txn.get('features') and not txn.get('shap_values'):
-                try:
-                    result = model_manager.predict_with_shap(txn['features'])
-                    shap_vals = result.get('shap_values')
-                    feature_names = result.get('shap_feature_names', [])
-                    model_feats = result.get('features')
-                    if shap_vals is not None:
-                        txn['shap_values'] = [
-                            {
-                                'name': n,
-                                'display_name': FEATURE_DISPLAY_NAMES.get(n, n),
-                                'value': float(model_feats[i]) if model_feats is not None else 0,
-                                'contribution': float(shap_vals[i]),
-                            }
-                            for i, n in enumerate(feature_names)
-                        ]
-                except Exception as e:
-                    logger.warning("SHAP for report failed on txn: %s", e)
-        try:
-            gen = FraudLensReportGenerator(payload, config, model_manager=model_manager)
-            buf, report_id = gen.generate()
-            _report_store[report_id] = buf.read()
-            return jsonify({
-                'success': True,
-                'report_id': report_id,
-                'download_url': f'/api/report/download/{report_id}',
-            })
-        except Exception as e:
-            logger.exception("Report generation error")
-            return jsonify({'error': str(e)}), 500
-
-    @api_bp.route('/report/download/<report_id>', methods=['GET'])
-    def download_report(report_id):
-        import io as _io
-        from flask import send_file
-        pdf_bytes = _report_store.pop(report_id, None)
-        if pdf_bytes is None:
-            return jsonify({'error': 'Report not found or already downloaded'}), 404
-        return send_file(
-            _io.BytesIO(pdf_bytes),
-            mimetype='application/pdf',
-            as_attachment=True,
-            download_name=f'{report_id}.pdf',
-        )
 
     app.register_blueprint(api_bp)

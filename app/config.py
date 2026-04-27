@@ -15,15 +15,20 @@ SIM_DATA_DIR = os.path.join(BASE_DIR, 'data')  # simulation datasets
 # Layout: models/saved/{01_baseline,02_comparator,03_proposed,supplementary}/
 # Each main-model folder is self-contained for the marker.
 MODEL_FILES = {
-    'xgb_cw':       os.path.join(MODELS_DIR, 'supplementary', 'xgboost_baseline_cw.joblib'),
-    'xgb_tuned':    os.path.join(MODELS_DIR, '01_baseline',   'xgboost_smote_tuned.joblib'),
-    'ae_model':     os.path.join(MODELS_DIR, '03_proposed',   'ae_model.pt'),
-    'ae_scaler':    os.path.join(MODELS_DIR, '03_proposed',   'ae_scaler.joblib'),
-    'ae_xgb':       os.path.join(MODELS_DIR, '03_proposed',   'ae_xgboost_smote_tuned.joblib'),
-    'bds_profiles': os.path.join(MODELS_DIR, '03_proposed',   'bds_profiles.joblib'),
-    'ga_params':    os.path.join(MODELS_DIR, '03_proposed',   'ga_best_params.json'),
-    'bds_xgb':      os.path.join(MODELS_DIR, '03_proposed',   'ae_bds_xgboost_smote_tuned.joblib'),
+    'xgb_cw':           os.path.join(MODELS_DIR, 'supplementary', 'xgboost_baseline_cw.joblib'),
+    'xgb_tuned':        os.path.join(MODELS_DIR, '01_baseline',   'xgboost_smote_tuned.joblib'),
+    'ae_model':         os.path.join(MODELS_DIR, '03_proposed',   'ae_model.pt'),
+    'ae_scaler':        os.path.join(MODELS_DIR, '03_proposed',   'ae_scaler.joblib'),
+    'ae_xgb':           os.path.join(MODELS_DIR, '03_proposed',   'ae_xgboost_smote_tuned.joblib'),
+    'bds_profiles':     os.path.join(MODELS_DIR, '03_proposed',   'bds_profiles.joblib'),
+    'ga_params':        os.path.join(MODELS_DIR, '03_proposed',   'ga_best_params.json'),
+    'bds_xgb':          os.path.join(MODELS_DIR, '03_proposed',   'ae_bds_xgboost_smote_tuned.joblib'),
+    'lstm_keras':       os.path.join(MODELS_DIR, '02_comparator', 'lstm_rf_keras.keras'),
+    'lstm_rf_scaler':   os.path.join(MODELS_DIR, '02_comparator', 'lstm_rf_scaler.joblib'),
+    'lstm_rf_clf':      os.path.join(MODELS_DIR, '02_comparator', 'lstm_rf_classifier.joblib'),
 }
+
+LSTM_SEQ_LEN = 5  # LSTM hybrid was trained with windows of 5 transactions
 
 STATS_FILES = {
     'training_stats': os.path.join(STATS_DIR, 'training_stats.json'),
@@ -69,13 +74,16 @@ MODEL_CODE_TO_INTERNAL = {
     'xgboost_smote':    'XGBoost (SMOTE+Tuned)',
     'ae_xgboost':       'AE+XGBoost',
     'ae_bds_xgboost':   'AE+BDS+XGBoost',
+    'lstm_rf_hybrid':   'LSTM+RF',
 }
 # internal name → display name shown in UI
+# Labels deliberately omit "SMOTE" (preprocessing detail, not a feature to advertise).
 MODEL_INTERNAL_TO_DISPLAY = {
-    'XGBoost (Class Weights)': 'XGBoost Baseline',
-    'XGBoost (SMOTE+Tuned)':   'XGBoost + SMOTE',
-    'AE+XGBoost':              'Autoencoder + XGBoost',
-    'AE+BDS+XGBoost':          'AE + BDS + XGBoost',
+    'XGBoost (Class Weights)': 'XGBoost (Class Weights)',
+    'XGBoost (SMOTE+Tuned)':   'XGBoost (Baseline)',
+    'AE+XGBoost':              'AE + XGBoost (Ablation)',
+    'AE+BDS+XGBoost':          'AE + BDS + GA + XGBoost (Proposed)',
+    'LSTM+RF':                 'LSTM + Random Forest (Hybrid)',
 }
 # display name → F1 score label (4-decimal precision, per verified_metrics.json @ threshold=0.5)
 MODEL_F1_LABELS = {
@@ -83,6 +91,7 @@ MODEL_F1_LABELS = {
     'xgboost_smote':    'F1: 0.8646',
     'ae_xgboost':       'F1: 0.8690',
     'ae_bds_xgboost':   'F1: 0.8706',
+    'lstm_rf_hybrid':   'F1: 0.7892',
 }
 
 # ---- 3-Model Staged Study framing ----
@@ -91,23 +100,24 @@ MODEL_F1_LABELS = {
 MODEL_CATEGORIES = {
     'XGBoost (Class Weights)': 'supplementary',
     'XGBoost (SMOTE+Tuned)':   'baseline',
-    'AE+XGBoost':              'proposed_component',
+    'AE+XGBoost':              'supplementary',
     'AE+BDS+XGBoost':          'proposed',
+    'LSTM+RF':                 'comparator',
 }
 
 MODEL_CATEGORY_LABELS = {
-    'baseline':           'Baseline',
-    'comparator':         'Hybrid Comparator',
-    'proposed_component': 'Proposed Model — Component',
-    'proposed':           'Proposed Model',
-    'supplementary':      'Supplementary',
+    'baseline':      'Baseline',
+    'comparator':    'Comparator',
+    'proposed':      'Proposed',
+    'supplementary': 'Ablation / Supplementary',
 }
 
 MODEL_DESCRIPTIONS = {
-    'XGBoost (Class Weights)': 'Supplementary baseline variant — class-weighted, no SMOTE',
-    'XGBoost (SMOTE+Tuned)':   'Strong tabular baseline using gradient boosting',
-    'AE+XGBoost':              'Proposed Model component (without BDS) — adds anomaly signal',
-    'AE+BDS+XGBoost':          'Proposed Model — anomaly + behavioural hybrid (default)',
+    'XGBoost (Class Weights)': 'Ablation variant — class-weighted XGBoost, no SMOTE',
+    'XGBoost (SMOTE+Tuned)':   'Baseline — SMOTE-balanced, GA-tuned XGBoost',
+    'AE+XGBoost':              'Ablation variant of Proposed Model (BDS removed)',
+    'AE+BDS+XGBoost':          'Proposed Model — autoencoder + BDS + XGBoost (default)',
+    'LSTM+RF':                 'Comparator — sequence LSTM feeding a Random Forest classifier',
 }
 
 # Headline 3-Model Staged Study metrics — sourced from results/verified_metrics.json @ threshold=0.5.
@@ -115,7 +125,7 @@ MODEL_DESCRIPTIONS = {
 # Model Performance page. LSTM PR-AUC is "n/a (not recorded)" in verified_metrics.json.
 STAGED_STUDY_TABLE_A = [
     {'category': 'Baseline',           'model': 'XGBoost (SMOTE+tuned)',      'f1': 0.8646, 'precision': 0.9297, 'recall': 0.8079, 'roc_auc': 0.9972, 'pr_auc': 0.9092},
-    {'category': 'Hybrid Comparator',  'model': 'LSTM + Random Forest',       'f1': 0.7892, 'precision': 0.6770, 'recall': 0.9459, 'roc_auc': 0.9981, 'pr_auc': None},
+    {'category': 'Comparator',         'model': 'LSTM + Random Forest',       'f1': 0.7892, 'precision': 0.6770, 'recall': 0.9459, 'roc_auc': 0.9981, 'pr_auc': 0.9517},
     {'category': 'Proposed Model',     'model': 'AE + BDS(GA) + XGBoost',     'f1': 0.8706, 'precision': 0.9338, 'recall': 0.8154, 'roc_auc': 0.9976, 'pr_auc': 0.9158},
 ]
 
@@ -155,6 +165,7 @@ FEATURE_DISPLAY_NAMES = {
     'bds_time':                     'Time Deviation (BDS)',
     'bds_freq':                     'Frequency Deviation (BDS)',
     'bds_category':                 'Category Novelty (BDS)',
+    'lstm_sequence_prob':           'Sequence Pattern (LSTM)',
 }
 
 # ---- Gender encoding ----

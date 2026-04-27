@@ -115,16 +115,14 @@
     <div class="d-flex align-items-center gap-3 flex-wrap mb-2">
         <div class="d-flex align-items-center gap-2">
             <label class="text-muted mb-0" style="white-space:nowrap;font-size:0.82rem;">Model:</label>
-            <select id="model-select" class="form-select form-select-sm" style="min-width:300px;" onchange="switchModel(this.value)">
-                <optgroup label="Baseline">
-                    <option value="xgboost_smote">XGBoost (SMOTE+Tuned) (F1: 0.8646)</option>
+            <select id="model-select" class="form-select form-select-sm" style="min-width:420px;" onchange="switchModel(this.value)">
+                <optgroup label="Headline Models (3-Model Study)">
+                    <option value="xgboost_smote">1. Baseline — XGBoost — F1: 0.8646</option>
+                    <option value="lstm_rf_hybrid">2. Comparator — LSTM + Random Forest — F1: 0.7892</option>
+                    <option value="ae_bds_xgboost" selected>3. Proposed — AE + BDS + GA + XGBoost — F1: 0.8706 ★ Default</option>
                 </optgroup>
-                <optgroup label="Proposed Model">
-                    <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.8706) ★ Default</option>
-                    <option value="ae_xgboost">AE + XGBoost — Component (F1: 0.8690)</option>
-                </optgroup>
-                <optgroup label="Supplementary">
-                    <option value="xgboost_baseline">XGBoost (Class Weights) (F1: 0.5215)</option>
+                <optgroup label="Ablation Variant">
+                    <option value="ae_xgboost">AE + XGBoost (Proposed without BDS) — F1: 0.8690</option>
                 </optgroup>
             </select>
         </div>
@@ -201,10 +199,10 @@
             <thead>
                 <tr>
                     <th>Metric</th>
-                    <th>XGBoost Base <small class="text-muted d-block">Supplementary · F1:0.5215</small></th>
-                    <th>XGBoost+SMOTE <small class="text-muted d-block">Baseline · F1:0.8646</small></th>
-                    <th>AE+XGBoost <small class="text-muted d-block">Proposed Component · F1:0.8690</small></th>
-                    <th class="highlight">AE+BDS+XGBoost ★ <small class="d-block">Proposed Model · F1:0.8706</small></th>
+                    <th>Baseline<br>XGBoost <small class="text-muted d-block">F1:0.8646</small></th>
+                    <th>Comparator<br>LSTM + RF <small class="text-muted d-block">F1:0.7892</small></th>
+                    <th>Ablation<br>AE + XGBoost <small class="text-muted d-block">F1:0.8690</small></th>
+                    <th class="highlight">Proposed ★<br>AE + BDS + GA + XGBoost <small class="d-block">F1:0.8706</small></th>
                 </tr>
             </thead>
             <tbody id="compare-stats-body">
@@ -314,8 +312,8 @@ let timelineChart = null;
 
 // ---- Compare Mode State ----
 let compareMode = false;
-const CMP_CODES  = ['xgboost_baseline','xgboost_smote','ae_xgboost','ae_bds_xgboost'];
-const CMP_LABELS = {'xgboost_baseline':'XGBoost Base','xgboost_smote':'XGBoost+SMOTE','ae_xgboost':'AE+XGBoost','ae_bds_xgboost':'AE+BDS+XGBoost ★'};
+const CMP_CODES  = ['xgboost_smote','lstm_rf_hybrid','ae_xgboost','ae_bds_xgboost'];
+const CMP_LABELS = {'xgboost_smote':'Baseline — XGBoost','lstm_rf_hybrid':'Comparator — LSTM + RF','ae_xgboost':'Ablation — AE + XGBoost','ae_bds_xgboost':'Proposed — AE + BDS + GA + XGBoost ★'};
 const CMP_COLORS = {'FRAUD':'#e74c3c','REVIEW':'#f39c12','NORMAL':'#2ecc71'};
 let cmpStats = {};
 
@@ -378,16 +376,16 @@ function finishSimulation() {
     if (compareMode) {
         _renderCmpStats();
         const bdsTp  = (cmpStats['ae_bds_xgboost']||{}).tp || 0;
-        const baseTp = (cmpStats['xgboost_baseline']||{}).tp || 0;
+        const baseTp = (cmpStats['xgboost_smote']||{}).tp || 0;
         document.getElementById('sim-counter').textContent =
-            `Complete! ${processedCount} processed — AE+BDS: ${bdsTp} fraud caught, Baseline: ${baseTp}`;
+            `Complete! ${processedCount} processed — Modified: ${bdsTp} fraud caught, Baseline: ${baseTp}`;
         // Append summary card to feed
         const summary = document.createElement('div');
         summary.className = 'compare-card';
         summary.style.background = 'rgba(231,76,60,0.05)';
         summary.innerHTML = `<div class="compare-card-header" style="font-weight:700;">
             Simulation Complete — ${processedCount} transactions processed
-            &nbsp;|&nbsp; AE+BDS caught <span style="color:#e74c3c">${bdsTp}</span> frauds
+            &nbsp;|&nbsp; Modified caught <span style="color:#e74c3c">${bdsTp}</span> frauds
             vs Baseline <span style="color:#aaa">${baseTp}</span>
             &nbsp;|&nbsp; Difference: <span style="color:var(--accent);font-weight:800;">+${bdsTp - baseTp}</span>
         </div>`;
@@ -414,8 +412,8 @@ function toggleCompareMode() {
         statsCol.style.display = 'none';
         cmpPanel.style.display = 'block';
         latestAlert.style.display = 'none';
-        feedTitle.textContent = 'Transaction Feed — Compare Mode (4 models per transaction)';
-        showToast('Compare Mode ON — all 4 models run per transaction (slightly slower)', 'info');
+        feedTitle.textContent = 'Transaction Feed — Compare Mode (Baseline vs Modified)';
+        showToast('Compare Mode ON — Baseline and Modified run per transaction', 'info');
     } else {
         modelSel.disabled = false;
         feedCol.className  = 'col-md-6';

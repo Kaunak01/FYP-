@@ -112,7 +112,7 @@
     {
       "experiment_name": "LSTM_reproduced_baseline",
       "gap_addressed": "Gap 1: sequence model ablation",
-      "model": "LSTM(64)+Dropout0.3+Dense32+Dense16+Sigmoid → RandomForest(200,d12,cw150)",
+      "model": "LSTM(64)+Dropout0.3+Dense32+Dense16+Sigmoid \u2192 RandomForest(200,d12,cw150)",
       "features_used": [
         "amt",
         "city_pop",
@@ -141,12 +141,13 @@
       "TN": 552606,
       "runtime_seconds": 473.0636558532715,
       "random_state": 42,
-      "notes": "Keras 3.14 + PyTorch 2.11 CPU backend (original Colab used Keras-on-TF-GPU). Architecture/hyperparameters preserved exactly per LSTM_BASELINE_CONFIG.json. Data from fraudTrain/Test_engineered_with_ids.csv (post-alignment fix). Expected ±0.01-0.02 F1 drift vs TF backend. Supersedes original F1=0.4747 which was produced by the BROKEN alignment pipeline (cc_num positional attach silently misaligned). See AUDIT_WIN_NARRATIVE.md and FYP_Hybrid_Model_BROKEN.ipynb."
+      "notes": "Keras 3.14 + PyTorch 2.11 CPU backend (original Colab used Keras-on-TF-GPU). Architecture/hyperparameters preserved exactly per LSTM_BASELINE_CONFIG.json. Data from fraudTrain/Test_engineered_with_ids.csv (post-alignment fix). Expected \u00b10.01-0.02 F1 drift vs TF backend. Supersedes original F1=0.4747 which was produced by the BROKEN alignment pipeline (cc_num positional attach silently misaligned). See AUDIT_WIN_NARRATIVE.md and FYP_Hybrid_Model_BROKEN.ipynb. PR-AUC computed post-hoc from saved artifacts via scripts/compute_lstm_pr_auc.py (deterministic, seed=42).",
+      "PR_AUC": 0.9517
     },
     {
       "experiment_name": "LSTM_no_velocity",
       "gap_addressed": "Gap 1: sequence model ablation",
-      "model": "LSTM(64)+Dropout0.3+Dense32+Dense16+Sigmoid → RandomForest(200,d12,cw150)",
+      "model": "LSTM(64)+Dropout0.3+Dense32+Dense16+Sigmoid \u2192 RandomForest(200,d12,cw150)",
       "features_used": [
         "amt",
         "city_pop",
@@ -172,12 +173,12 @@
       "TN": 552529,
       "runtime_seconds": 604.980132818222,
       "random_state": 42,
-      "notes": "Keras 3.14 + PyTorch 2.11 CPU backend (original Colab used Keras-on-TF-GPU). Architecture/hyperparameters preserved exactly per LSTM_BASELINE_CONFIG.json. Data from fraudTrain/Test_engineered_with_ids.csv (post-alignment fix). Expected ±0.01-0.02 F1 drift vs TF backend. Velocity features removed to test LSTM capacity without engineered sequence signals."
+      "notes": "Keras 3.14 + PyTorch 2.11 CPU backend (original Colab used Keras-on-TF-GPU). Architecture/hyperparameters preserved exactly per LSTM_BASELINE_CONFIG.json. Data from fraudTrain/Test_engineered_with_ids.csv (post-alignment fix). Expected \u00b10.01-0.02 F1 drift vs TF backend. Velocity features removed to test LSTM capacity without engineered sequence signals."
     },
     {
       "experiment_name": "LSTM_with_velocity",
       "gap_addressed": "Gap 1: sequence model ablation",
-      "model": "LSTM(64)+Dropout0.3+Dense32+Dense16+Sigmoid → RandomForest(200,d12,cw150)",
+      "model": "LSTM(64)+Dropout0.3+Dense32+Dense16+Sigmoid \u2192 RandomForest(200,d12,cw150)",
       "features_used": [
         "amt",
         "city_pop",

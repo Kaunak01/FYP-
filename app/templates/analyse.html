@@ -15,16 +15,14 @@
             <div class="card p-3">
                 <div class="d-flex align-items-center gap-3 flex-wrap">
                     <label class="text-muted mb-0" style="white-space:nowrap;font-size:0.85rem;">Select Model</label>
-                    <select id="model-select" class="form-select form-select-sm" style="max-width:380px;" onchange="switchModel(this.value)">
-                        <optgroup label="Baseline">
-                            <option value="xgboost_smote">XGBoost (SMOTE+Tuned) (F1: 0.8646)</option>
+                    <select id="model-select" class="form-select form-select-sm" style="max-width:480px;" onchange="switchModel(this.value)">
+                        <optgroup label="Headline Models (3-Model Study)">
+                            <option value="xgboost_smote">1. Baseline — XGBoost — F1: 0.8646</option>
+                            <option value="lstm_rf_hybrid">2. Comparator — LSTM + Random Forest — F1: 0.7892</option>
+                            <option value="ae_bds_xgboost" selected>3. Proposed — AE + BDS + GA + XGBoost — F1: 0.8706 ★ Default</option>
                         </optgroup>
-                        <optgroup label="Proposed Model">
-                            <option value="ae_bds_xgboost" selected>AE + BDS + XGBoost (F1: 0.8706) ★ Default</option>
-                            <option value="ae_xgboost">AE + XGBoost — Component (F1: 0.8690)</option>
-                        </optgroup>
-                        <optgroup label="Supplementary">
-                            <option value="xgboost_baseline">XGBoost (Class Weights) — Supplementary (F1: 0.5215)</option>
+                        <optgroup label="Ablation Variant (component analysis)">
+                            <option value="ae_xgboost">AE + XGBoost (Proposed without BDS) — F1: 0.8690</option>
                         </optgroup>
                     </select>
                     <span id="model-switch-status" class="text-muted" style="font-size:0.8rem;"></span>
@@ -85,9 +83,6 @@
             </div>
             <div>
                 <button class="btn btn-sm btn-outline-secondary me-1" onclick="downloadResults()">Download CSV</button>
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="openReportModal()">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>PDF Report
-                </button>
                 <button class="btn btn-sm btn-fraudlens" onclick="resetAnalysis()">New Analysis</button>
             </div>
         </div>
@@ -251,53 +246,6 @@
     </div>
 </div>
 
-<!-- Report Config Modal -->
-<div id="report-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9900;overflow-y:auto;">
-  <div style="max-width:540px;margin:60px auto;background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-    <div style="background:#1a1a2e;color:#fff;padding:20px 24px;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
-      <div>
-        <div style="font-size:1.1rem;font-weight:700;letter-spacing:0.5px;">Generate PDF Report</div>
-        <div style="font-size:0.75rem;opacity:0.7;margin-top:2px;">Regulatory-grade fraud analysis document</div>
-      </div>
-      <button onclick="document.getElementById('report-modal').style.display='none'" style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
-    </div>
-    <div style="padding:24px;">
-      <div class="mb-3">
-        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Institution Name</label>
-        <input type="text" id="rpt-institution" class="form-control form-control-sm" value="Financial Institution" placeholder="e.g. First National Bank">
-      </div>
-      <div class="mb-3">
-        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Prepared By</label>
-        <input type="text" id="rpt-preparer" class="form-control form-control-sm" value="Fraud Analytics Team" placeholder="Analyst name / team">
-      </div>
-      <div class="mb-3">
-        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Classification Level</label>
-        <select id="rpt-classification" class="form-select form-select-sm">
-          <option value="CONFIDENTIAL" selected>CONFIDENTIAL</option>
-          <option value="INTERNAL">INTERNAL</option>
-          <option value="RESTRICTED">RESTRICTED</option>
-          <option value="PUBLIC">PUBLIC</option>
-        </select>
-      </div>
-      <div class="mb-3">
-        <label class="form-label" style="font-size:0.82rem;font-weight:600;">Sections to Include</label>
-        <div class="d-flex flex-column gap-1 mt-1">
-          <label class="d-flex align-items-center gap-2" style="font-size:0.82rem;cursor:pointer;"><input type="checkbox" id="rpt-inc-recommend" checked> Recommendations &amp; Action Plan</label>
-          <label class="d-flex align-items-center gap-2" style="font-size:0.82rem;cursor:pointer;"><input type="checkbox" id="rpt-inc-appendix" checked> Technical Appendix &amp; Glossary</label>
-        </div>
-      </div>
-      <hr>
-      <div id="rpt-status" style="font-size:0.82rem;min-height:20px;color:#636e72;margin-bottom:12px;"></div>
-      <div class="d-flex gap-2">
-        <button id="rpt-generate-btn" class="btn btn-sm btn-fraudlens flex-grow-1" onclick="generateReport()">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          Generate Report
-        </button>
-        <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('report-modal').style.display='none'">Cancel</button>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
@@ -392,7 +340,7 @@ function showResults(data, filename, totalRows) {
     const sel = document.getElementById('model-select');
     _lastUsedModel = sel ? sel.value : 'ae_bds_xgboost';
     document.getElementById('model-stale-banner').style.display = 'none';
-    const modelLabel = sel ? sel.options[sel.selectedIndex].text : 'AE + BDS + XGBoost';
+    const modelLabel = sel ? sel.options[sel.selectedIndex].text : 'AE + BDS + GA + XGBoost (Proposed)';
     document.getElementById('results-title').textContent = 'Analysis Complete';
     document.getElementById('results-subtitle').textContent = totalRows + ' transactions from ' + filename + ' — Model: ' + modelLabel;
     document.getElementById('r-fraud').textContent = c.FRAUD;
@@ -560,7 +508,7 @@ function buildPerformanceTab(perf) {
     // Baseline comparison
     document.getElementById('baseline-comparison').innerHTML =
         '<table class="table table-sm" style="font-size:0.82rem;">' +
-        '<tr><th>Metric</th><th>This Dataset</th><th>Baseline (XGBoost SMOTE+tuned)</th></tr>' +
+        '<tr><th>Metric</th><th>This Dataset</th><th>Baseline (XGBoost)</th></tr>' +
         '<tr><td>F1</td><td><strong>'+perf.f1+'</strong></td><td>0.8646</td></tr>' +
         '<tr><td>Precision</td><td><strong>'+perf.precision+'</strong></td><td>0.9297</td></tr>' +
         '<tr><td>Recall</td><td><strong>'+perf.recall+'</strong></td><td>0.8079</td></tr>' +
@@ -702,106 +650,5 @@ function downloadResults() {
     a.click();
 }
 
-// ---- PDF Report ----
-function openReportModal() {
-    if (!analysisData || !allResults.length) {
-        showToast('Run an analysis first before generating a report.', 'warning');
-        return;
-    }
-    document.getElementById('rpt-status').textContent = '';
-    document.getElementById('rpt-generate-btn').disabled = false;
-    document.getElementById('rpt-generate-btn').textContent = 'Generate Report';
-    document.getElementById('report-modal').style.display = 'block';
-}
-
-function generateReport() {
-    const btn = document.getElementById('rpt-generate-btn');
-    const status = document.getElementById('rpt-status');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generating...';
-    status.textContent = 'Building PDF — this may take 10-20 seconds...';
-    status.style.color = '#636e72';
-
-    const sel = document.getElementById('model-select');
-    const modelLabel = sel ? sel.options[sel.selectedIndex].text : 'FraudLens Model';
-
-    // Build top transactions list (top 50 by probability, with features)
-    const sorted = [...allResults].sort((a, b) => (b.probability||0) - (a.probability||0));
-    const topTxns = sorted.slice(0, 50).map(r => ({
-        transaction_id: r.transaction_id,
-        amount: r.amount || 0,
-        category: r.category || 'unknown',
-        hour: r.hour || 0,
-        probability: r.probability || 0,
-        risk_level: r.risk_level || 'LOW',
-        classification: r.classification || 'NORMAL',
-        rule_triggers: r.rule_triggers || [],
-        features: r.features || null,
-    }));
-
-    const payload = {
-        // Config
-        institution_name: document.getElementById('rpt-institution').value || 'Financial Institution',
-        prepared_by: document.getElementById('rpt-preparer').value || 'Fraud Analytics Team',
-        classification: document.getElementById('rpt-classification').value || 'CONFIDENTIAL',
-        include_recommendations: document.getElementById('rpt-inc-recommend').checked,
-        include_appendix: document.getElementById('rpt-inc-appendix').checked,
-        // Data
-        total: analysisData.total,
-        counts: analysisData.counts,
-        amount_at_risk: analysisData.amount_at_risk,
-        amount_safe: analysisData.amount_safe,
-        amount_stats: analysisData.amount_stats,
-        prob_distribution: analysisData.prob_distribution,
-        hour_counts: analysisData.hour_counts,
-        hour_fraud: analysisData.hour_fraud,
-        category_counts: analysisData.category_counts,
-        category_fraud: analysisData.category_fraud,
-        performance: analysisData.performance || null,
-        top_transactions: topTxns,
-        model_display: modelLabel,
-        filename: document.getElementById('results-subtitle').textContent,
-    };
-
-    fetch('/api/report/generate', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload),
-    })
-    .then(r => r.json())
-    .then(d => {
-        if (d.success && d.download_url) {
-            status.textContent = 'Report ready! Downloading...';
-            status.style.color = '#2ecc71';
-            // Trigger download
-            const a = document.createElement('a');
-            a.href = d.download_url;
-            a.download = d.report_id + '.pdf';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            btn.disabled = false;
-            btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Generate Report';
-            setTimeout(() => { document.getElementById('report-modal').style.display = 'none'; }, 1500);
-        } else {
-            throw new Error(d.error || 'Generation failed');
-        }
-    })
-    .catch(err => {
-        status.textContent = 'Error: ' + err.message;
-        status.style.color = '#e74c3c';
-        btn.disabled = false;
-        btn.innerHTML = 'Retry';
-    });
-}
-
-document.addEventListener('keydown', e => {
-    if (e.key === 'Escape' && document.getElementById('report-modal').style.display !== 'none') {
-        document.getElementById('report-modal').style.display = 'none';
-    }
-});
-document.getElementById('report-modal').addEventListener('click', function(e) {
-    if (e.target === this) this.style.display = 'none';
-});
 </script>
 {% endblock %}

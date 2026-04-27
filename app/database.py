@@ -117,6 +117,23 @@ class Database:
         finally:
             conn.close()
 
+    def get_card_recent_features(self, card_number, limit=4):
+        """Return up to `limit` most recent transactions' 14 feature columns
+        for a card, ordered oldest → newest. Used to build LSTM sequences."""
+        conn = self._connect()
+        try:
+            cols = ('amt, city_pop, hour, month, distance_cardholder_merchant, age, '
+                    'is_weekend, is_night, velocity_1h, velocity_24h, amount_velocity_1h, '
+                    'category_encoded, gender_encoded, day_of_week_encoded')
+            rows = conn.execute(
+                f"SELECT {cols} FROM transactions WHERE card_number = ? "
+                f"ORDER BY id DESC LIMIT ?",
+                (str(card_number), int(limit))
+            ).fetchall()
+            return [dict(r) for r in reversed(rows)]
+        finally:
+            conn.close()
+
     def get_card_velocity(self, card_number, current_timestamp):
         """Compute velocity features from card history.
         Returns (velocity_1h, velocity_24h, amount_velocity_1h)."""

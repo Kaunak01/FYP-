@@ -48,13 +48,6 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {% if request.path == '/alerts' %}active{% endif %}" href="/alerts">
-                        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-                        <span class="sidebar-text">Alerts</span>
-                        <span class="alert-count-badge" id="alert-badge" style="display:none;">0</span>
-                    </a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link {% if request.path == '/performance' %}active{% endif %}" href="/performance">
                         <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                         <span class="sidebar-text">Model Performance</span>
@@ -69,7 +62,7 @@
             </ul>
 
             <div class="sidebar-footer">
-                <span class="model-badge sidebar-text" id="active-model-badge">Model: XGBoost (SMOTE+Tuned)</span>
+                <span class="model-badge sidebar-text" id="active-model-badge">Model: AE + BDS + GA + XGBoost (Proposed)</span>
                 <div class="d-flex align-items-center gap-1 mt-1">
                     <span class="status-dot bg-success" style="width:6px;height:6px;border-radius:50%;display:inline-block;"></span>
                     <span class="powered-by sidebar-text">Powered by XGBoost + Autoencoder</span>
@@ -136,23 +129,15 @@
     <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/chart.umd.min.js') }}"></script>
     <script>
-    // Update alert badge
-    function updateAlertBadge() {
-        fetch('/api/stats').then(r=>r.json()).then(d => {
-            const badge = document.getElementById('alert-badge');
-            const pending = d.pending_review || 0;
-            if (pending > 0) { badge.textContent = pending; badge.style.display = 'inline'; }
-            else { badge.style.display = 'none'; }
-
-            // Update model badge
-            fetch('/api/model/info').then(r=>r.json()).then(m => {
-                const mb = document.getElementById('active-model-badge');
-                if (mb) mb.textContent = 'Model: ' + (m.active_model || 'None');
-            });
+    // Update active model badge in sidebar
+    function updateModelBadge() {
+        fetch('/api/model/info').then(r=>r.json()).then(m => {
+            const mb = document.getElementById('active-model-badge');
+            if (mb && m.active_model) mb.textContent = 'Model: ' + (m.active_display || m.active_model);
         }).catch(()=>{});
     }
-    updateAlertBadge();
-    setInterval(updateAlertBadge, 30000);
+    updateModelBadge();
+    setInterval(updateModelBadge, 30000);
 
     // ---- SHAP Explanation Modal ----
     let _shapChart = null;

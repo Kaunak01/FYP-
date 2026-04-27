@@ -12,10 +12,6 @@ dashboard_bp = Blueprint('dashboard', __name__)
 
 def init_dashboard(app, model_manager, db):
 
-    @dashboard_bp.route('/welcome')
-    def welcome():
-        return render_template('welcome.html')
-
     @dashboard_bp.route('/')
     def index():
         stats = db.get_stats()
@@ -34,15 +30,6 @@ def init_dashboard(app, model_manager, db):
     def predict_page():
         return render_template('predict.html')
 
-    @dashboard_bp.route('/batch')
-    def batch_page():
-        return render_template('batch.html')
-
-    @dashboard_bp.route('/alerts')
-    def alerts_page():
-        alerts = db.get_alerts(limit=200)
-        return render_template('alerts.html', alerts=alerts)
-
     @dashboard_bp.route('/performance')
     def performance_page():
         return render_template('model_performance.html', model_info=model_manager.get_model_info())
@@ -59,10 +46,7 @@ def init_dashboard(app, model_manager, db):
         test_df = pd.read_csv(test_path)
 
         np.random.seed(42)
-        if sample_type == 'normal':
-            sample = test_df[test_df['is_fraud'] == 0].sample(20, random_state=42)
-            filename = 'sample_normal.csv'
-        elif sample_type == 'mixed':
+        if sample_type == 'mixed':
             normals = test_df[test_df['is_fraud'] == 0].sample(45, random_state=42)
             frauds = test_df[test_df['is_fraud'] == 1].sample(5, random_state=42)
             sample = pd.concat([normals, frauds]).sample(frac=1, random_state=42)

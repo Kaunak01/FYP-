@@ -1,0 +1,29 @@
+{
+  "baseline": {
+    "model_internal_name": "XGBoost (SMOTE+Tuned)",
+    "median_ms": 0.748,
+    "p95_ms": 1.133,
+    "p99_ms": 2.992,
+    "mean_ms": 0.843,
+    "n_samples": 1000,
+    "warmup_calls": 25
+  },
+  "comparator": {
+    "model_internal_name": "LSTM+RF",
+    "median_ms": 88.973,
+    "p95_ms": 109.603,
+    "p99_ms": 208.206,
+    "mean_ms": 93.505,
+    "n_samples": 1000,
+    "warmup_calls": 25
+  },
+  "proposed": {
+    "model_internal_name": "AE+BDS+XGBoost",
+    "median_ms": 1.62,
+    "p95_ms": 2.619,
+    "p99_ms": 4.774,
+    "mean_ms": 1.793,
+    "n_samples": 1000,
+    "warmup_calls": 25
+  }
+}

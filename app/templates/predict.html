@@ -159,7 +159,7 @@ document.getElementById('predict-form').addEventListener('submit', function(e) {
 
         const prob = result.probability;
         const pct = (prob * 100).toFixed(1);
-        const risk = result.risk_level;
+        const band = result.triage_band;
         const cls = result.classification;
         const report = result.report;
 
@@ -173,12 +173,12 @@ document.getElementById('predict-form').addEventListener('submit', function(e) {
         clsBadge.className = 'badge fs-6 badge-' + cls;
 
         const riskBadge = document.getElementById('result-risk');
-        riskBadge.textContent = risk;
-        riskBadge.className = 'badge fs-6 badge-' + risk;
+        riskBadge.textContent = band;
+        riskBadge.className = 'badge fs-6 badge-' + band;
 
         // Result card color
         const card = document.getElementById('result-card');
-        card.className = 'prediction-result ' + risk;
+        card.className = 'prediction-result ' + band;
 
         // Probability bar
         const fill = document.getElementById('prob-fill');

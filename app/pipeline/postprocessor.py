@@ -36,24 +36,25 @@ _FEATURE_LABELS = {
     'bds_category': 'Category deviation score',
 }
 
-# Action recommendations by risk level
+# Action recommendations by triage band (dissertation §4.7).
+# Keyed by NONE / MONITOR / REVIEW / FRAUD.
 _RECOMMENDATIONS = {
-    'CRITICAL': {
+    'FRAUD': {
         'action': 'BLOCK IMMEDIATELY',
         'detail': 'Block transaction and contact cardholder immediately.',
         'color': '#e74c3c',
     },
-    'HIGH': {
+    'REVIEW': {
         'action': 'HOLD FOR REVIEW',
         'detail': 'Hold for manual review. Do not process until analyst confirms.',
         'color': '#e67e22',
     },
-    'MEDIUM': {
+    'MONITOR': {
         'action': 'PROCESS WITH MONITORING',
         'detail': 'Process but flag for end-of-day review by analyst.',
         'color': '#f39c12',
     },
-    'LOW': {
+    'NONE': {
         'action': 'PROCESS NORMALLY',
         'detail': 'No issues detected. Process normally.',
         'color': '#2ecc71',
@@ -64,7 +65,7 @@ _RECOMMENDATIONS = {
 class Postprocessor:
     """Generates human-readable prediction explanations."""
 
-    def format_prediction(self, features, probability, risk_level, classification,
+    def format_prediction(self, features, probability, triage_band, classification,
                           shap_values=None, shap_feature_names=None,
                           rule_result=None, metadata=None):
         """Generate a complete human-readable prediction report.
@@ -79,10 +80,10 @@ class Postprocessor:
         report['risk_assessment'] = {
             'probability': probability,
             'probability_pct': f'{pct:.1f}%',
-            'risk_level': risk_level,
+            'triage_band': triage_band,
             'classification': classification,
-            'headline': self._headline(risk_level, probability, classification),
-            'color': _RECOMMENDATIONS.get(risk_level, _RECOMMENDATIONS['LOW'])['color'],
+            'headline': self._headline(triage_band, probability, classification),
+            'color': _RECOMMENDATIONS.get(triage_band, _RECOMMENDATIONS['NONE'])['color'],
         }
 
         # ---- 2. Key Factors (from SHAP) ----
@@ -117,7 +118,7 @@ class Postprocessor:
         report['away_from_fraud'] = away_fraud
 
         # ---- 3. Recommendation ----
-        rec = _RECOMMENDATIONS.get(risk_level, _RECOMMENDATIONS['LOW'])
+        rec = _RECOMMENDATIONS.get(triage_band, _RECOMMENDATIONS['NONE'])
         report['recommendation'] = {
             'action': rec['action'],
             'detail': rec['detail'],
@@ -176,7 +177,7 @@ class Postprocessor:
 
         return report
 
-    def _headline(self, risk_level, probability, classification):
+    def _headline(self, triage_band, probability, classification):
         pct = probability * 100
         if classification == 'FRAUD':
             return f'FRAUD DETECTED - {pct:.1f}% fraud probability'
@@ -252,7 +253,7 @@ class Postprocessor:
         lines = []
         ra = report['risk_assessment']
         lines.append(f"--- {ra['headline']} ---")
-        lines.append(f"Probability: {ra['probability_pct']} | Risk: {ra['risk_level']} | Decision: {ra['classification']}")
+        lines.append(f"Probability: {ra['probability_pct']} | Triage: {ra['triage_band']} | Decision: {ra['classification']}")
         lines.append("")
 
         if report['toward_fraud']:
@@ -284,9 +285,9 @@ if __name__ == '__main__':
 
     pp = Postprocessor()
 
-    # Test 1: CRITICAL fraud
+    # Test 1: FRAUD band ($800, 3am)
     print("="*60)
-    print("TEST 1: CRITICAL FRAUD ($800, 3am)")
+    print("TEST 1: FRAUD BAND ($800, 3am)")
     print("="*60)
     features1 = {
         'amt': 800, 'city_pop': 5000, 'hour': 3, 'month': 3,
@@ -297,14 +298,14 @@ if __name__ == '__main__':
     }
     shap_vals = np.array([1.8, -0.1, 0.5, -0.2, 0.3, 0.4, 0.8, 1.5, 0.6, -0.3, 3.2, 1.1, -0.1, -0.5])
     report1 = pp.format_prediction(
-        features1, probability=0.993, risk_level='CRITICAL', classification='FRAUD',
+        features1, probability=0.993, triage_band='FRAUD', classification='FRAUD',
         shap_values=shap_vals, shap_feature_names=FEATURE_COLS
     )
     print(report1['summary'])
 
     # Test 2: LOW normal
     print("\n" + "="*60)
-    print("TEST 2: LOW RISK ($15, noon)")
+    print("TEST 2: NONE BAND ($15, noon)")
     print("="*60)
     features2 = {
         'amt': 15, 'city_pop': 50000, 'hour': 12, 'month': 6,
@@ -315,14 +316,14 @@ if __name__ == '__main__':
     }
     shap_vals2 = np.array([-1.8, -0.1, 0.5, -0.2, -0.3, -0.1, -0.3, -4.1, -0.2, -1.5, -2.4, 1.1, -0.1, -0.5])
     report2 = pp.format_prediction(
-        features2, probability=0.001, risk_level='LOW', classification='NORMAL',
+        features2, probability=0.001, triage_band='NONE', classification='NORMAL',
         shap_values=shap_vals2, shap_feature_names=FEATURE_COLS
     )
     print(report2['summary'])
 
     # Test 3: REVIEW (model missed, rules caught)
     print("\n" + "="*60)
-    print("TEST 3: REVIEW (model NORMAL but rules HIGH)")
+    print("TEST 3: REVIEW band via rules (model prob low, rules HIGH)")
     print("="*60)
     from app.pipeline.rule_engine import RuleEngine, RuleResult
     engine = RuleEngine()
@@ -335,7 +336,7 @@ if __name__ == '__main__':
     }
     rule_result = engine.evaluate(features3)
     report3 = pp.format_prediction(
-        features3, probability=0.15, risk_level='HIGH', classification='REVIEW',
+        features3, probability=0.15, triage_band='NONE', classification='REVIEW',
         shap_values=shap_vals, shap_feature_names=FEATURE_COLS,
         rule_result=rule_result
     )

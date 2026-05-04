@@ -14,6 +14,18 @@ from sklearn.metrics import (roc_auc_score, average_precision_score,
 TEST_CSV   = "fraudTest_engineered.csv"
 MODELS_DIR = "models/saved"
 
+# Subfolder-keyed model paths (post April 27 restructure; mirrors app/config.py MODEL_FILES).
+MODEL_PATHS = {
+    'ae_scaler':    f"{MODELS_DIR}/03_proposed/ae_scaler.joblib",
+    'ae_model':     f"{MODELS_DIR}/03_proposed/ae_model.pt",
+    'bds_profiles': f"{MODELS_DIR}/03_proposed/bds_profiles.joblib",
+    'ga_params':    f"{MODELS_DIR}/03_proposed/ga_best_params.json",
+    'xgb_cw':       f"{MODELS_DIR}/supplementary/xgboost_baseline_cw.joblib",
+    'xgb_tuned':    f"{MODELS_DIR}/01_baseline/xgboost_smote_tuned.joblib",
+    'ae_xgb':       f"{MODELS_DIR}/03_proposed/ae_xgboost_smote_tuned.joblib",
+    'bds_xgb':      f"{MODELS_DIR}/03_proposed/ae_bds_xgboost_smote_tuned.joblib",
+}
+
 # Must match the exact column order used in save_all_models.py (all cols except is_fraud, unix_time)
 FEATURE_COLS = ['amt', 'city_pop', 'hour', 'month', 'distance_cardholder_merchant',
                 'age', 'is_weekend', 'is_night', 'velocity_1h', 'velocity_24h',
@@ -31,7 +43,7 @@ print(f"  {len(df):,} rows | {y_test.sum():,} fraud ({y_test.mean()*100:.2f}%)\n
 # ── Autoencoder reconstruction error helper ───────────────────────────────────
 def ae_reconstruction_error(X):
     """Returns per-row MSE reconstruction error from the PyTorch autoencoder."""
-    scaler = joblib.load(f"{MODELS_DIR}/ae_scaler.joblib")
+    scaler = joblib.load(MODEL_PATHS['ae_scaler'])
     X_scaled = scaler.transform(X).astype(np.float32)
 
     # Build same architecture as training
@@ -51,7 +63,7 @@ def ae_reconstruction_error(X):
             return self.decoder(self.encoder(x))
 
     ae = Autoencoder(n_features=X.shape[1])
-    ae.load_state_dict(torch.load(f"{MODELS_DIR}/ae_model.pt", map_location='cpu'))
+    ae.load_state_dict(torch.load(MODEL_PATHS['ae_model'], map_location='cpu'))
     ae.eval()
 
     tensor = torch.tensor(X_scaled)
@@ -63,8 +75,8 @@ def ae_reconstruction_error(X):
 # ── BDS features helper ───────────────────────────────────────────────────────
 def add_bds_features(X, df_ref):
     """Compute 4 BDS deviation scores using saved profiles."""
-    profiles = joblib.load(f"{MODELS_DIR}/bds_profiles.joblib")
-    ga_params = __import__('json').load(open(f"{MODELS_DIR}/ga_best_params.json"))
+    profiles = joblib.load(MODEL_PATHS['bds_profiles'])
+    ga_params = __import__('json').load(open(MODEL_PATHS['ga_params']))
 
     # BDS scores: amount_dev, velocity_dev, time_dev, category_dev
     # Replicate the same logic used during training
@@ -118,13 +130,13 @@ results = []
 # ── 1. XGBoost Baseline (class weights) ──────────────────────────────────────
 print("=" * 65)
 print("1. XGBoost Baseline (class weights)")
-xgb_cw = joblib.load(f"{MODELS_DIR}/xgboost_baseline_cw.joblib")
+xgb_cw = joblib.load(MODEL_PATHS['xgb_cw'])
 y_proba = xgb_cw.predict_proba(X_test)[:, 1]
 results.append(print_metrics("XGBoost Baseline (CW)", y_test, y_proba))
 
 # ── 2. XGBoost SMOTE + tuned ──────────────────────────────────────────────────
 print("2. XGBoost SMOTE + tuned")
-xgb_sm = joblib.load(f"{MODELS_DIR}/xgboost_smote_tuned.joblib")
+xgb_sm = joblib.load(MODEL_PATHS['xgb_tuned'])
 y_proba = xgb_sm.predict_proba(X_test)[:, 1]
 results.append(print_metrics("XGBoost SMOTE+tuned", y_test, y_proba))
 
@@ -133,7 +145,7 @@ print("3. AE + XGBoost SMOTE + tuned")
 print("   (computing AE reconstruction errors — may take ~30s)")
 ae_errors = ae_reconstruction_error(X_test)
 X_ae = np.hstack([X_test, ae_errors.reshape(-1, 1)])
-ae_xgb = joblib.load(f"{MODELS_DIR}/ae_xgboost_smote_tuned.joblib")
+ae_xgb = joblib.load(MODEL_PATHS['ae_xgb'])
 y_proba = ae_xgb.predict_proba(X_ae)[:, 1]
 results.append(print_metrics("AE + XGBoost SMOTE+tuned", y_test, y_proba))
 
@@ -141,7 +153,7 @@ results.append(print_metrics("AE + XGBoost SMOTE+tuned", y_test, y_proba))
 print("4. AE + BDS + XGBoost SMOTE + tuned")
 print("   (computing BDS scores — may take a few minutes on 555K rows)")
 X_ae_bds = add_bds_features(X_ae, df)
-ae_bds_xgb = joblib.load(f"{MODELS_DIR}/ae_bds_xgboost_smote_tuned.joblib")
+ae_bds_xgb = joblib.load(MODEL_PATHS['bds_xgb'])
 y_proba = ae_bds_xgb.predict_proba(X_ae_bds)[:, 1]
 results.append(print_metrics("AE + BDS + XGBoost SMOTE+tuned", y_test, y_proba))
 

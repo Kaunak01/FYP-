@@ -557,7 +557,7 @@ function renderTable() {
         row.title = 'Click to see SHAP explanation';
         row.onclick = () => openShapForResult(start + i);
         row.innerHTML = '<td>'+(start+i+1)+'</td><td><strong style="font-family:var(--mono);">$'+(r.amount||0).toFixed(2)+'</strong></td><td>'+
-            (r.category||'-')+'</td><td>'+(r.hour||'-')+':00</td><td><div class="d-flex align-items-center gap-2"><div class="prob-meter flex-grow-1"><div class="fill" style="width:'+pct+'%;background:'+color+';"></div></div><span style="font-family:var(--mono);font-size:0.78rem;font-weight:600;color:'+color+';">'+pct+'%</span></div></td><td><span class="badge badge-'+(r.risk_level||'LOW')+'">'+(r.risk_level||'LOW')+'</span></td><td><span class="badge badge-'+(r.classification||'NORMAL')+'">'+(r.classification||'NORMAL')+'</span></td><td class="small">'+(r.rule_triggers&&r.rule_triggers.length?r.rule_triggers.join(', '):'ML detection')+'</td><td><button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();openShapForResult('+(start+i)+')">Explain</button></td>';
+            (r.category||'-')+'</td><td>'+(r.hour||'-')+':00</td><td><div class="d-flex align-items-center gap-2"><div class="prob-meter flex-grow-1"><div class="fill" style="width:'+pct+'%;background:'+color+';"></div></div><span style="font-family:var(--mono);font-size:0.78rem;font-weight:600;color:'+color+';">'+pct+'%</span></div></td><td><span class="badge badge-'+(r.triage_band||'NONE')+'">'+(r.triage_band||'NONE')+'</span></td><td><span class="badge badge-'+(r.classification||'NORMAL')+'">'+(r.classification||'NORMAL')+'</span></td><td class="small">'+(r.rule_triggers&&r.rule_triggers.length?r.rule_triggers.join(', '):'ML detection')+'</td><td><button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();openShapForResult('+(start+i)+')">Explain</button></td>';
         tbody.appendChild(row);
     });
     const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
@@ -640,9 +640,9 @@ function switchModel(code) {
 })();
 
 function downloadResults() {
-    let csv = 'transaction_id,amount,category,hour,probability,risk_level,classification,rule_triggers\n';
+    let csv = 'transaction_id,amount,category,hour,probability,triage_band,classification,rule_triggers\n';
     allResults.forEach(r => {
-        csv += [r.transaction_id, r.amount||0, r.category||'', r.hour||'', r.probability||0, r.risk_level||'', r.classification||'', (r.rule_triggers||[]).join(';')].join(',') + '\n';
+        csv += [r.transaction_id, r.amount||0, r.category||'', r.hour||'', r.probability||0, r.triage_band||'', r.classification||'', (r.rule_triggers||[]).join(';')].join(',') + '\n';
     });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));

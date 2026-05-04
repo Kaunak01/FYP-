@@ -79,9 +79,9 @@
                 <span style="font-size:0.85rem;font-weight:600;">{{ MODEL_INTERNAL_TO_DISPLAY.get(model_info.active_model, model_info.active_model) }}</span>
             </div>
             <table class="table table-sm" style="font-size:0.8rem;">
-                <tr><td class="text-muted">Baseline F1</td><td class="text-end"><strong style="font-family:var(--mono);">0.8646</strong></td></tr>
-                <tr><td class="text-muted">Precision</td><td class="text-end"><strong style="font-family:var(--mono);">0.9297</strong></td></tr>
-                <tr><td class="text-muted">Recall</td><td class="text-end"><strong style="font-family:var(--mono);">0.8079</strong></td></tr>
+                <tr><td class="text-muted">F1</td><td class="text-end"><strong style="font-family:var(--mono);">{{ '%.4f'|format(active_metrics.f1) if active_metrics else '—' }}</strong></td></tr>
+                <tr><td class="text-muted">Precision</td><td class="text-end"><strong style="font-family:var(--mono);">{{ '%.4f'|format(active_metrics.precision) if active_metrics else '—' }}</strong></td></tr>
+                <tr><td class="text-muted">Recall</td><td class="text-end"><strong style="font-family:var(--mono);">{{ '%.4f'|format(active_metrics.recall) if active_metrics else '—' }}</strong></td></tr>
                 <tr><td class="text-muted">Throughput</td><td class="text-end"><strong style="font-family:var(--mono);">826K/s</strong></td></tr>
                 <tr><td class="text-muted">Drift Status</td><td class="text-end"><span class="badge" style="background:#2ecc71;">GREEN</span></td></tr>
             </table>

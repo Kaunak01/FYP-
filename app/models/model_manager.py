@@ -199,35 +199,96 @@ class ModelManager:
         return float(np.mean((scaled - recon) ** 2))
 
     def compute_bds_scores(self, features_dict):
-        """Compute 4 BDS scores using global stats fallback."""
+        """Compute 4 BDS scores using per-card profiles when available, with
+        global-stats fallback for unseen cards or those with insufficient
+        history. Mirrors the training-time behaviour in scripts/run_bds_ga.py
+        so the deployed inference path matches the offline evaluation that
+        produced verified_metrics.json.
+        """
         if self.bds_profiles is None or self.ga_params is None:
             return 0.0, 0.0, 0.0, 0.0
 
         gs = self.bds_profiles['global_stats']
         params = list(self.ga_params['params'].values())
-        at, ac, tt, tc, ft, fc, ct, cc_, mh, sm = params
+        at, ac, tt, tc, ft, fc, ct, cc_, mh_f, sm = params
+        mh = int(round(mh_f))
 
         amt = features_dict.get('amt', 0)
         hour = int(features_dict.get('hour', 12))
         cat = int(features_dict.get('category_encoded', 0))
         vel = features_dict.get('velocity_1h', 1)
 
-        # Amount deviation
-        amt_z = abs(amt - gs['amt_mean']) / gs['amt_std'] if gs['amt_std'] > 0 else 0
+        # Try per-card lookup. The card identifier may arrive under either
+        # 'cc_num' (numeric Sparkov id) or 'card_number' (raw API field).
+        # Both are coerced to int for the profiles index lookup; if coercion
+        # fails or the card is unknown, fall back to global stats.
+        card_id_raw = features_dict.get('cc_num')
+        if card_id_raw is None:
+            card_id_raw = features_dict.get('card_number')
+        card_id_int = None
+        if card_id_raw is not None:
+            try:
+                card_id_int = int(card_id_raw)
+            except (ValueError, TypeError):
+                card_id_int = None
+
+        card_amt_df = self.bds_profiles.get('card_amt')
+        card_hour_df = self.bds_profiles.get('card_hour_prob')
+        card_cat_df = self.bds_profiles.get('card_cat_prob')
+        card_vel_df = self.bds_profiles.get('card_vel')
+
+        use_per_card = False
+        c_amt_mean = c_amt_std = 0.0
+        c_hour_p = c_cat_p = 0.0
+        c_vel_mean = 0.0
+        if (card_id_int is not None and card_amt_df is not None
+                and card_id_int in card_amt_df.index):
+            row_amt = card_amt_df.loc[card_id_int]
+            count = int(row_amt['amt_count']) if 'amt_count' in row_amt else 0
+            if count >= mh:
+                use_per_card = True
+                c_amt_mean = float(row_amt['amt_mean'])
+                c_amt_std = float(row_amt['amt_std'])
+                if card_hour_df is not None and hour in card_hour_df.columns:
+                    c_hour_p = float(card_hour_df.loc[card_id_int, hour])
+                if card_cat_df is not None and cat in card_cat_df.columns:
+                    c_cat_p = float(card_cat_df.loc[card_id_int, cat])
+                if card_vel_df is not None:
+                    c_vel_mean = float(card_vel_df.loc[card_id_int, 'vel_mean'])
+
+        # ---- Amount deviation ----
+        if use_per_card:
+            safe_std = c_amt_std if c_amt_std > 0 else gs['amt_std']
+            amt_z = abs(amt - c_amt_mean) / safe_std if safe_std > 0 else 0
+        else:
+            amt_z = abs(amt - gs['amt_mean']) / gs['amt_std'] if gs['amt_std'] > 0 else 0
         amount_score = min(max(amt_z - at, 0), ac)
 
-        # Time deviation
-        hour_prob = gs['hour_prob'].get(str(hour), 1/24)
+        # ---- Time deviation ----
+        # Note: profiles dicts use integer keys; previous code was looking up
+        # str(hour) and silently defaulting on every row.
+        if use_per_card:
+            hour_prob = c_hour_p
+        else:
+            hour_prob = gs['hour_prob'].get(hour, 1.0 / 24)
         import math
         time_raw = -math.log(hour_prob + sm)
         time_score = min(max(time_raw - tt, 0), tc)
 
-        # Frequency deviation
-        freq_raw = max(vel / gs['vel_mean'] - 1.0, 0) if gs['vel_mean'] > 0 else 0
+        # ---- Frequency deviation ----
+        if use_per_card and c_vel_mean > 0:
+            freq_raw = max(vel / c_vel_mean - 1.0, 0)
+        elif gs['vel_mean'] > 0:
+            freq_raw = max(vel / gs['vel_mean'] - 1.0, 0)
+        else:
+            freq_raw = 0
         freq_score = min(max(freq_raw - ft, 0), fc)
 
-        # Category deviation
-        cat_prob = gs['cat_prob'].get(str(cat), 1 / gs['n_categories'])
+        # ---- Category deviation ----
+        if use_per_card:
+            cat_prob = c_cat_p
+        else:
+            cat_prob = gs['cat_prob'].get(cat, 1.0 / gs['n_categories'])
         cat_raw = -math.log(cat_prob + sm)
         cat_score = min(max(cat_raw - ct, 0), cc_)
 

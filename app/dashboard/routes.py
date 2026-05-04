@@ -9,6 +9,40 @@ from flask import Blueprint, render_template, send_file, Response
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
+# Internal model name → entry name in results/verified_metrics.json
+_VERIFIED_METRICS_KEY = {
+    'XGBoost (Class Weights)': 'XGBoost Baseline (CW)',
+    'XGBoost (SMOTE+Tuned)':   'XGBoost SMOTE+tuned',
+    'AE+XGBoost':              'AE + XGBoost SMOTE+tuned',
+    'AE+BDS+XGBoost':          'AE + BDS + XGBoost (full)',
+}
+
+
+def _load_active_model_metrics(active_model_name):
+    """Return {f1, precision, recall} for the active model at threshold=0.5,
+    or None if not found. LSTM+RF lives in `gap_experiments` and uses
+    different key casing."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    metrics_path = os.path.normpath(os.path.join(here, '..', '..', 'results', 'verified_metrics.json'))
+    if not os.path.exists(metrics_path):
+        return None
+    with open(metrics_path) as f:
+        data = json.load(f)
+
+    if active_model_name == 'LSTM+RF':
+        for e in data.get('gap_experiments', []):
+            if e.get('experiment_name') == 'LSTM_reproduced_baseline':
+                return {'f1': e['F1'], 'precision': e['Precision'], 'recall': e['Recall']}
+        return None
+
+    target = _VERIFIED_METRICS_KEY.get(active_model_name)
+    if not target:
+        return None
+    for m in data.get('models', []):
+        if m.get('model') == target and m.get('threshold') == 0.5:
+            return {'f1': m['f1'], 'precision': m['precision'], 'recall': m['recall']}
+    return None
+
 
 def init_dashboard(app, model_manager, db):
 
@@ -16,7 +50,11 @@ def init_dashboard(app, model_manager, db):
     def index():
         stats = db.get_stats()
         model_info = model_manager.get_model_info()
-        return render_template('dashboard.html', stats=stats, model_info=model_info)
+        active_metrics = _load_active_model_metrics(model_info.get('active_model'))
+        return render_template('dashboard.html',
+                               stats=stats,
+                               model_info=model_info,
+                               active_metrics=active_metrics)
 
     @dashboard_bp.route('/analyse')
     def analyse_page():

@@ -604,7 +604,7 @@ function handleEvent(data) {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <strong>${data.transaction_id}</strong> - $${data.amount.toFixed(2)}
-                        <span class="badge badge-${data.risk_level} ms-2">${data.risk_level}</span>
+                        <span class="badge badge-${data.triage_band} ms-2">${data.triage_band}</span>
                         <span class="badge badge-${data.classification} ms-1">${data.classification}</span>
                         ${correct}
                     </div>

@@ -7,7 +7,7 @@ import random
 import logging
 import collections
 from flask import Blueprint, Response, request, jsonify, stream_with_context
-from app.config import DEFAULT_THRESHOLD, RISK_LEVELS, FEATURE_COLS, SIMULATION_DATASETS, MODEL_INTERNAL_TO_DISPLAY
+from app.config import DEFAULT_THRESHOLD, TRIAGE_BANDS, FEATURE_COLS, SIMULATION_DATASETS, MODEL_INTERNAL_TO_DISPLAY
 
 logger = logging.getLogger(__name__)
 
@@ -35,11 +35,12 @@ if os.path.exists(_cat_map_path):
         _cat_map = {int(k): v for k, v in _raw.get('code_to_name', {}).items()}
 
 
-def get_risk_level(prob):
-    for level, (lo, hi) in RISK_LEVELS.items():
+def get_triage_band(prob):
+    """Map probability → triage band per dissertation §4.7."""
+    for band, (lo, hi) in TRIAGE_BANDS.items():
         if lo <= prob < hi:
-            return level
-    return 'CRITICAL'
+            return band
+    return 'FRAUD'
 
 
 def _stream_demo(model_manager, preprocessor, rule_engine, db, delay, max_txns, compare=False):
@@ -64,9 +65,10 @@ def _stream_demo(model_manager, preprocessor, rule_engine, db, delay, max_txns, 
             'amount_velocity_1h': txn['amount_velocity_1h'],
         }
         features, metadata = preprocessor.process(txn, velocity_override=velocity_override)
+        features['cc_num'] = metadata.get('card_number') or txn.get('cc_num')
         result = model_manager.predict(features)
         probability = result['probability']
-        risk_level = get_risk_level(probability)
+        triage_band = get_triage_band(probability)
         rule_result = rule_engine.evaluate(features)
         classification, combined_prob, decision_reason = rule_engine.combine_decision(
             probability, rule_result, DEFAULT_THRESHOLD
@@ -77,7 +79,7 @@ def _stream_demo(model_manager, preprocessor, rule_engine, db, delay, max_txns, 
             'transaction_id': txn['transaction_id'], 'card_number': txn['card_number'],
             'timestamp': txn['timestamp'], 'amount': txn['amount'],
             'category': txn['merchant_category'], 'probability': probability,
-            'risk_level': risk_level, 'classification': classification,
+            'triage_band': triage_band, 'classification': classification,
             'rule_triggers': ','.join(r[0] for r in rule_result.triggered_rules) if rule_result.any_triggered else None,
             'processing_time_ms': elapsed_ms, 'velocity_source': 'override',
         }
@@ -89,7 +91,7 @@ def _stream_demo(model_manager, preprocessor, rule_engine, db, delay, max_txns, 
         if is_alert:
             db.store_alert({
                 'transaction_id': txn['transaction_id'], 'probability': probability,
-                'risk_level': risk_level, 'classification': classification,
+                'triage_band': triage_band, 'classification': classification,
                 'amount': txn['amount'], 'category': txn['merchant_category'],
                 'rule_triggers': txn_record['rule_triggers'], 'explanation': decision_reason,
             })
@@ -99,7 +101,7 @@ def _stream_demo(model_manager, preprocessor, rule_engine, db, delay, max_txns, 
             'transaction_id': txn['transaction_id'], 'card_number': txn['card_number'],
             'amount': txn['amount'],
             'timestamp': txn['timestamp'], 'category': txn['merchant_category'],
-            'probability': round(probability, 6), 'risk_level': risk_level,
+            'probability': round(probability, 6), 'triage_band': triage_band,
             'classification': classification, 'actual_is_fraud': txn['actual_is_fraud'],
             'correct': (classification in ('FRAUD', 'REVIEW') and txn['actual_is_fraud'] == 1) or
                        (classification == 'NORMAL' and txn['actual_is_fraud'] == 0),
@@ -157,9 +159,13 @@ def _stream_csv(filepath, model_manager, preprocessor, rule_engine, db, delay, m
                 timestamp = str(row.get('unix_time', ''))
                 actual_fraud = int(float(row.get('is_fraud', 0)))
 
+                # Surface card identifier so AE+BDS path uses per-card profiles.
+                # Real cc_num from the engineered CSV when available; falls back
+                # to the synthetic CARD-XXXX label otherwise.
+                features['cc_num'] = row.get('cc_num') or card_num
                 result = model_manager.predict(features)
                 probability = result['probability']
-                risk_level = get_risk_level(probability)
+                triage_band = get_triage_band(probability)
                 rule_result = rule_engine.evaluate(features)
                 classification, combined_prob, decision_reason = rule_engine.combine_decision(
                     probability, rule_result, DEFAULT_THRESHOLD
@@ -170,7 +176,7 @@ def _stream_csv(filepath, model_manager, preprocessor, rule_engine, db, delay, m
                     'transaction_id': txn_id, 'card_number': card_num,
                     'timestamp': timestamp, 'amount': features['amt'],
                     'category': cat_name, 'probability': probability,
-                    'risk_level': risk_level, 'classification': classification,
+                    'triage_band': triage_band, 'classification': classification,
                     'rule_triggers': ','.join(r[0] for r in rule_result.triggered_rules) if rule_result.any_triggered else None,
                     'processing_time_ms': elapsed_ms, 'velocity_source': 'precomputed',
                 }
@@ -182,7 +188,7 @@ def _stream_csv(filepath, model_manager, preprocessor, rule_engine, db, delay, m
                 if is_alert:
                     db.store_alert({
                         'transaction_id': txn_id, 'probability': probability,
-                        'risk_level': risk_level, 'classification': classification,
+                        'triage_band': triage_band, 'classification': classification,
                         'amount': features['amt'], 'category': cat_name,
                         'rule_triggers': txn_record['rule_triggers'], 'explanation': decision_reason,
                     })
@@ -193,7 +199,7 @@ def _stream_csv(filepath, model_manager, preprocessor, rule_engine, db, delay, m
                     'transaction_id': txn_id, 'card_number': card_num,
                     'amount': features['amt'],
                     'timestamp': timestamp, 'category': cat_name,
-                    'probability': round(probability, 6), 'risk_level': risk_level,
+                    'probability': round(probability, 6), 'triage_band': triage_band,
                     'classification': classification, 'actual_is_fraud': actual_fraud,
                     'correct': (classification in ('FRAUD', 'REVIEW') and actual_fraud == 1) or
                                (classification == 'NORMAL' and actual_fraud == 0),
@@ -335,11 +341,13 @@ def init_simulation(app, model_manager, preprocessor, rule_engine, postprocessor
                 'gender_encoded':               float(random.randint(0, 1)),
                 'day_of_week_encoded':          float(random.randint(0, 6)),
             }
+            # Inject-attack uses a synthetic card label; falls back to global BDS.
+            features['cc_num'] = attack_card
 
             try:
                 result = model_manager.predict(features)
                 probability = result['probability']
-                risk_level = get_risk_level(probability)
+                triage_band = get_triage_band(probability)
                 rule_result = rule_engine.evaluate(features)
                 classification, combined_prob, decision_reason = rule_engine.combine_decision(
                     probability, rule_result, DEFAULT_THRESHOLD
@@ -347,7 +355,7 @@ def init_simulation(app, model_manager, preprocessor, rule_engine, postprocessor
             except Exception as e:
                 logger.warning("inject_attack prediction error: %s", e)
                 probability = 0.92
-                risk_level = 'CRITICAL'
+                triage_band = 'FRAUD'
                 classification = 'FRAUD'
                 rule_result = None
                 decision_reason = 'Injected attack'
@@ -358,7 +366,7 @@ def init_simulation(app, model_manager, preprocessor, rule_engine, postprocessor
                 'transaction_id': txn_id, 'card_number': attack_card,
                 'timestamp': '', 'amount': features['amt'],
                 'category': scenario['cat_name'], 'probability': probability,
-                'risk_level': risk_level, 'classification': classification,
+                'triage_band': triage_band, 'classification': classification,
                 'rule_triggers': ','.join(r[0] for r in rule_result.triggered_rules) if rule_result and rule_result.any_triggered else 'INJECTED_ATTACK',
                 'processing_time_ms': 0.0, 'velocity_source': 'injected',
             }
@@ -367,7 +375,7 @@ def init_simulation(app, model_manager, preprocessor, rule_engine, postprocessor
                 db.store_transaction(txn_record)
                 db.store_alert({
                     'transaction_id': txn_id, 'probability': probability,
-                    'risk_level': risk_level, 'classification': classification,
+                    'triage_band': triage_band, 'classification': classification,
                     'amount': features['amt'], 'category': scenario['cat_name'],
                     'rule_triggers': txn_record['rule_triggers'], 'explanation': decision_reason,
                 })
@@ -383,7 +391,7 @@ def init_simulation(app, model_manager, preprocessor, rule_engine, postprocessor
                 'timestamp': '',
                 'category': scenario['cat_name'],
                 'probability': round(probability, 6),
-                'risk_level': risk_level,
+                'triage_band': triage_band,
                 'classification': classification,
                 'actual_is_fraud': 1,
                 'correct': classification in ('FRAUD', 'REVIEW'),

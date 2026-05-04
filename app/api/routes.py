@@ -5,7 +5,7 @@ from functools import wraps
 from collections import defaultdict
 from flask import Blueprint, request, jsonify
 from app.config import (
-    DEFAULT_THRESHOLD, RISK_LEVELS,
+    DEFAULT_THRESHOLD, TRIAGE_BANDS,
     MODEL_CODE_TO_INTERNAL, MODEL_INTERNAL_TO_DISPLAY,
     MODEL_CATEGORIES, MODEL_CATEGORY_LABELS, MODEL_DESCRIPTIONS,
     SIMULATION_DATASETS, FEATURE_DISPLAY_NAMES, FEATURE_COLS,
@@ -33,11 +33,16 @@ def rate_limit(f):
     return decorated
 
 
-def get_risk_level(prob):
-    for level, (lo, hi) in RISK_LEVELS.items():
+def get_triage_band(prob):
+    """Map probability → triage band per dissertation §4.7.
+
+    Boundaries belong to the higher band (0.30 → MONITOR, 0.50 → REVIEW,
+    0.70 → FRAUD). Returns one of: NONE, MONITOR, REVIEW, FRAUD.
+    """
+    for band, (lo, hi) in TRIAGE_BANDS.items():
         if lo <= prob < hi:
-            return level
-    return 'CRITICAL'
+            return band
+    return 'FRAUD'
 
 
 def _generate_shap_summary(features, prediction):
@@ -74,6 +79,16 @@ def _generate_shap_summary(features, prediction):
             reasons.append(f"the merchant is {v:.0f}km from the cardholder's location")
         else:
             reasons.append(f"{f['display_name'].lower()} contributed to the score")
+    # Wording adapts to whether the transaction is in the NONE band (< 0.30 → no
+    # triage action) or above it. Keeps the modal copy consistent with the badge
+    # for normal transactions instead of saying everything was "flagged".
+    if prediction < 0.30:
+        if not reasons:
+            return f"Approved with {prediction*100:.1f}% fraud probability — no individual feature pushed strongly toward fraud."
+        elif len(reasons) == 1:
+            return f"Approved with {prediction*100:.1f}% fraud probability; the main factor that contributed to the score was that {reasons[0]}."
+        else:
+            return f"Approved with {prediction*100:.1f}% fraud probability; the main factors that contributed to the score were that {', '.join(reasons[:-1])}, and {reasons[-1]}."
     if not reasons:
         return f"Flagged with {prediction*100:.1f}% fraud probability based on a combination of subtle patterns."
     elif len(reasons) == 1:
@@ -109,6 +124,11 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
 
             features, metadata = preprocessor.process(data, velocity_override=velocity_override)
 
+            # Surface card identifier into features so AE+BDS+XGBoost can use
+            # per-card BDS profiles. Falls back to global stats inside
+            # ModelManager.compute_bds_scores when the card is unknown.
+            features['cc_num'] = metadata.get('card_number')
+
             # Build prior-feature sequence for LSTM+RF (no-op for other models)
             prior = None
             if model_manager.active_model_name == 'LSTM+RF' and metadata.get('card_number'):
@@ -117,7 +137,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
             # Predict (with SHAP for single transactions)
             result = model_manager.predict_with_shap(features, prior_features=prior)
             probability = result['probability']
-            risk_level = get_risk_level(probability)
+            triage_band = get_triage_band(probability)
 
             # Rule engine
             rule_result = rule_engine.evaluate(features)
@@ -127,7 +147,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
 
             # Postprocess
             report = postprocessor.format_prediction(
-                features, probability, risk_level, classification,
+                features, probability, triage_band, classification,
                 shap_values=result.get('shap_values'),
                 shap_feature_names=result.get('shap_feature_names'),
                 rule_result=rule_result, metadata=metadata
@@ -141,7 +161,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                 'amount': features['amt'],
                 'category': metadata['category_name'],
                 'probability': probability,
-                'risk_level': risk_level,
+                'triage_band': triage_band,
                 'classification': classification,
                 'rule_triggers': ','.join(r[0] for r in rule_result.triggered_rules) if rule_result.any_triggered else None,
                 'processing_time_ms': result['processing_time_ms'],
@@ -161,7 +181,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                 db.store_alert({
                     'transaction_id': metadata['transaction_id'],
                     'probability': probability,
-                    'risk_level': risk_level,
+                    'triage_band': triage_band,
                     'classification': classification,
                     'amount': features['amt'],
                     'category': metadata['category_name'],
@@ -172,7 +192,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
             return jsonify({
                 'transaction_id': metadata['transaction_id'],
                 'probability': probability,
-                'risk_level': risk_level,
+                'triage_band': triage_band,
                 'classification': classification,
                 'combined_probability': combined_prob,
                 'processing_time_ms': result['processing_time_ms'],
@@ -204,9 +224,10 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                     velocity_override = {k: txn[k] for k in ['velocity_1h', 'velocity_24h', 'amount_velocity_1h']}
 
                 features, metadata = preprocessor.process(txn, velocity_override=velocity_override)
+                features['cc_num'] = metadata.get('card_number')  # for per-card BDS lookup
                 pred = model_manager.predict(features)
                 probability = pred['probability']
-                risk_level = get_risk_level(probability)
+                triage_band = get_triage_band(probability)
                 rule_result = rule_engine.evaluate(features)
                 classification, _, _ = rule_engine.combine_decision(probability, rule_result)
 
@@ -222,7 +243,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                 results.append({
                     'transaction_id': metadata['transaction_id'],
                     'probability': probability,
-                    'risk_level': risk_level,
+                    'triage_band': triage_band,
                     'classification': classification,
                     'amount': features['amt'],
                 })
@@ -402,6 +423,8 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                     velocity_override = {k: txn[k] for k in ['velocity_1h', 'velocity_24h', 'amount_velocity_1h']}
 
                 features, metadata = preprocessor.process(txn, velocity_override=velocity_override)
+                # Surface card identifier so AE+BDS path uses per-card BDS profiles.
+                features['cc_num'] = metadata.get('card_number') or txn.get('cc_num')
 
                 prior = None
                 if lstm_active:
@@ -416,7 +439,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                     if len(buf) > 4:
                         buf.pop(0)
                 probability = pred['probability']
-                risk_level = get_risk_level(probability)
+                triage_band = get_triage_band(probability)
                 rule_result = rule_engine.evaluate(features)
                 classification, combined_prob, reason = rule_engine.combine_decision(probability, rule_result)
 
@@ -433,7 +456,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                 results.append({
                     'transaction_id': metadata.get('transaction_id', f'ROW-{len(results)+1}'),
                     'probability': probability,
-                    'risk_level': risk_level,
+                    'triage_band': triage_band,
                     'classification': classification,
                     'amount': features['amt'],
                     'hour': int(features['hour']),
@@ -449,7 +472,7 @@ def init_api(app, model_manager, preprocessor, rule_engine, postprocessor, drift
                 })
             except Exception as e:
                 results.append({'transaction_id': txn.get('transaction_id', '?'), 'error': str(e),
-                                'probability': 0, 'classification': 'NORMAL', 'risk_level': 'LOW',
+                                'probability': 0, 'classification': 'NORMAL', 'triage_band': 'NONE',
                                 'amount': 0, 'hour': 0, 'category': 'unknown',
                                 'velocity_1h': 0, 'velocity_24h': 0, 'amount_velocity_1h': 0, 'is_night': 0,
                                 'rule_triggers': []})

@@ -40,7 +40,7 @@ class Database:
                     category_encoded INTEGER, gender_encoded INTEGER,
                     day_of_week_encoded INTEGER,
                     probability REAL,
-                    risk_level TEXT,
+                    triage_band TEXT,
                     classification TEXT,
                     rule_triggers TEXT,
                     processing_time_ms REAL,
@@ -52,7 +52,7 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     transaction_id TEXT,
                     probability REAL,
-                    risk_level TEXT,
+                    triage_band TEXT,
                     classification TEXT,
                     amount REAL,
                     category TEXT,
@@ -178,7 +178,7 @@ class Database:
                     'amt', 'city_pop', 'hour', 'month', 'distance_cardholder_merchant',
                     'age', 'is_weekend', 'is_night', 'velocity_1h', 'velocity_24h',
                     'amount_velocity_1h', 'category_encoded', 'gender_encoded',
-                    'day_of_week_encoded', 'probability', 'risk_level', 'classification',
+                    'day_of_week_encoded', 'probability', 'triage_band', 'classification',
                     'rule_triggers', 'processing_time_ms', 'velocity_source']
             values = [txn_data.get(c) for c in cols]
             placeholders = ','.join(['?'] * len(cols))
@@ -206,10 +206,10 @@ class Database:
         conn = self._connect()
         try:
             conn.execute(
-                "INSERT INTO alerts (transaction_id, probability, risk_level, classification, "
+                "INSERT INTO alerts (transaction_id, probability, triage_band, classification, "
                 "amount, category, rule_triggers, explanation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (alert_data.get('transaction_id'), alert_data.get('probability'),
-                 alert_data.get('risk_level'), alert_data.get('classification'),
+                 alert_data.get('triage_band'), alert_data.get('classification'),
                  alert_data.get('amount'), alert_data.get('category'),
                  alert_data.get('rule_triggers'), alert_data.get('explanation'))
             )

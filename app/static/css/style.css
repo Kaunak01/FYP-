@@ -246,14 +246,13 @@ body {
     margin-top: 6px;
 }
 
-/* ===== RISK BADGES ===== */
-.badge-CRITICAL { background: linear-gradient(135deg, #c0392b, #e74c3c) !important; box-shadow: 0 2px 8px rgba(192,57,43,0.3); }
-.badge-HIGH { background: linear-gradient(135deg, #d63031, #e74c3c) !important; box-shadow: 0 2px 8px rgba(231,76,60,0.3); }
-.badge-MEDIUM { background: linear-gradient(135deg, #e67e22, #f39c12) !important; }
-.badge-LOW { background: linear-gradient(135deg, #27ae60, #2ecc71) !important; }
+/* ===== TRIAGE BAND BADGES ===== */
+/* Used for both `triage_band` (NONE/MONITOR/REVIEW/FRAUD) and `classification`
+   (NORMAL/MONITOR/REVIEW/FRAUD). NONE and NORMAL share the green styling. */
 .badge-FRAUD { background: linear-gradient(135deg, #c0392b, #e74c3c) !important; box-shadow: 0 2px 8px rgba(231,76,60,0.3); }
 .badge-REVIEW { background: linear-gradient(135deg, #e67e22, #f39c12) !important; }
 .badge-MONITOR { background: linear-gradient(135deg, #f39c12, #f1c40f) !important; color: #333 !important; }
+.badge-NONE { background: linear-gradient(135deg, #27ae60, #2ecc71) !important; }
 .badge-NORMAL { background: linear-gradient(135deg, #27ae60, #2ecc71) !important; }
 
 .badge { font-weight: 600; letter-spacing: 0.3px; padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; }

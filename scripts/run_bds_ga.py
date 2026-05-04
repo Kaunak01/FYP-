@@ -395,10 +395,12 @@ print(f"ROC-AUC: {roc_auc_score(y_test, y_prob_tuned):.4f} | F1: {f1_tuned:.4f}"
 # ============================================================
 # 9. RESULTS COMPARISON
 # ============================================================
+# Hybrid1 (LSTM+RF) and Hybrid2 (AE+XGBoost) F1s sourced from results/verified_metrics.json
+# (post-fix composite-key merge pipeline, threshold=0.5)
 results = pd.DataFrame({
     'Model': ['LSTM+RF (Hybrid1)','AE+XGBoost (Hybrid2)',
               'AE+BDS(GA)+XGB (CW)','AE+BDS(GA)+XGB (SMOTE)','AE+BDS(GA)+XGB (SMOTE+Tuned)'],
-    'F1': [0.47, 0.87, f1_cw, f1_sm, f1_tuned],
+    'F1': [0.7892, 0.8690, f1_cw, f1_sm, f1_tuned],
     'ROC-AUC': [0.994, 0.997, roc_auc_score(y_test,y_prob_cw), roc_auc_score(y_test,y_prob_sm), roc_auc_score(y_test,y_prob_tuned)]
 }).sort_values('F1', ascending=False)
 print("\n" + results.to_string(index=False))
@@ -484,8 +486,9 @@ print("FINAL RESULTS SUMMARY")
 print("="*65)
 print(f"\n  {'Model':<45s} {'F1':>6s}")
 print(f"  {'-'*45} {'-'*6}")
-print(f"  {'LSTM + RF (Hybrid 1)':<45s} {'0.47':>6s}")
-print(f"  {'AE + XGBoost (Hybrid 2)':<45s} {'0.87':>6s}")
+# F1 values for Hybrid1/Hybrid2 sourced from results/verified_metrics.json
+print(f"  {'LSTM + RF (Hybrid 1)':<45s} {'0.7892':>6s}")
+print(f"  {'AE + XGBoost (Hybrid 2)':<45s} {'0.8690':>6s}")
 print(f"  {'AE + BDS(GA) + XGBoost (CW)':<45s} {f1_cw:>6.4f}")
 print(f"  {'AE + BDS(GA) + XGBoost (SMOTE)':<45s} {f1_sm:>6.4f}")
 print(f"  {'AE + BDS(GA) + XGBoost (SMOTE+Tuned)':<45s} {f1_tuned:>6.4f}")

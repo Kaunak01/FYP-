@@ -50,8 +50,17 @@ REVIEW_THRESHOLD   = 0.50  # prob >= 0.50 → REVIEW (or rules HIGH/CRITICAL)
 MONITOR_THRESHOLD  = 0.30  # prob >= 0.30 → MONITOR (or rules MEDIUM)
 OPTIMAL_THRESHOLD  = 0.70  # kept for backwards compatibility
 
-# ---- Risk levels ----
-RISK_LEVELS = {'LOW': (0.0, 0.2), 'MEDIUM': (0.2, 0.5), 'HIGH': (0.5, 0.8), 'CRITICAL': (0.8, 1.01)}
+# ---- Triage bands ----
+# Pure-probability mapping (mirrors dissertation §4.7). The boundary belongs to
+# the higher band: exactly 0.30 → MONITOR, exactly 0.50 → REVIEW, exactly 0.70 → FRAUD.
+# Distinct from `classification`, which is the rule-combined decision produced
+# by RuleEngine.combine_decision().
+TRIAGE_BANDS = {
+    'NONE':    (0.0,  0.30),
+    'MONITOR': (0.30, 0.50),
+    'REVIEW':  (0.50, 0.70),
+    'FRAUD':   (0.70, 1.01),
+}
 
 # ---- Decision outcomes ----
 # FRAUD:   model prob >= threshold

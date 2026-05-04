@@ -9,10 +9,22 @@ __pycache__/
 
 # Logs
 *.log
+app/logs/
+
+# Runtime database
+app/fraud_detection.db
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Coverage
+.coverage
+
+# Backup files
+*.bak
+*.bak2
 
 # IDE
 .vscode/

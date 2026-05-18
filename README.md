@@ -1,6 +1,4 @@
-# FraudLens — Credit Card Fraud Detection Under Extreme Class Imbalance
-
-A hybrid machine learning system combining anomaly detection, behavioural profiling, and evolutionary optimisation for real-time credit card fraud detection.
+# AI-based Credit Card Fraud Detection with Velocity Feature Engineering and Behavioural Profiling 
 
 **Author:** Kaunak (Student ID: 001354164)  
 **Module:** COMP1682 Final Year Project  
